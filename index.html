@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drift Control</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--text:#16181d;--muted:#6b7280;--line:#e3e5ea;--accent:#0a84ff;--accent-text:#fff;--danger:#d92d20;--ok:#12a150;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0e0f12;--card:#17191e;--text:#eceef2;--muted:#9aa1ad;--line:#2a2d35;--accent:#3d9bff;--danger:#ff6b61;--ok:#34c76f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:16px 16px 40px}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font-size:22px;margin:0}
+.status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ok)}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 10px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1 1 0;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+button{font:inherit;font-size:15px;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:10px;padding:10px 8px;min-height:44px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+button:disabled{opacity:.4;cursor:default}
+input,select,textarea{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-height:44px}
+textarea{resize:vertical;min-height:72px}
+label{font-size:13px;color:var(--muted);display:block;margin:10px 0 4px}
+label.check{display:flex;align-items:center;gap:8px;margin-top:10px}
+label.check input{width:auto;min-height:0}
+.stats{display:flex;gap:18px;margin-bottom:12px}
+.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+#log{font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:280px;overflow:auto;background:var(--bg);border-radius:10px;padding:10px;margin:0}
+#log div{padding:2px 0;border-bottom:1px solid var(--line)}
+.hint{font-size:12px;color:var(--muted);margin:8px 0 0}
+.warn{color:var(--danger)}
+.ok{color:var(--ok)}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Drift Control</h1>
+    <div class="status"><span id="dot" class="dot"></span><span id="statusText">Disconnected</span></div>
+  </header>
+
+  <section>
+    <div class="stats">
+      <div class="stat"><b id="battery">–</b><span>Battery</span></div>
+      <div class="stat"><b id="hr">–</b><span>Heart rate</span></div>
+    </div>
+    <label for="name">Watch name starts with</label>
+    <input id="name" value="DRIFT" autocomplete="off">
+    <div class="row" style="margin-top:10px">
+      <button id="connectBtn" class="primary">Connect</button>
+      <button id="disconnectBtn" disabled>Disconnect</button>
+    </div>
+    <p class="hint">Close the Zero app first — the watch accepts one connection at a time. On iPhone, open this page in Bluefy.</p>
+  </section>
+
+  <section>
+    <h2>Message</h2>
+    <label for="msgType">Type</label>
+    <select id="msgType" data-conn>
+      <option value="1">01 · Message (works)</option>
+      <option value="0">00 · Incoming call (caller name)</option>
+      <option value="2">02</option><option value="3">03</option><option value="4">04</option>
+      <option value="5">05</option><option value="6">06</option><option value="7">07</option>
+      <option value="8">08</option><option value="9">09</option><option value="10">0A</option>
+      <option value="11">0B</option><option value="12">0C</option><option value="13">0D</option>
+      <option value="14">0E</option><option value="15">0F</option>
+    </select>
+    <label for="msgText">Text</label>
+    <textarea id="msgText" placeholder="Hi from the web" data-conn></textarea>
+    <div class="row" style="margin-top:10px">
+      <button id="sendMsgBtn" class="primary" data-conn>Send</button>
+      <button id="endCallBtn" data-conn>End call</button>
+      <button id="buzzBtn" data-conn>Buzz</button>
+    </div>
+    <p class="hint" id="msgInfo">0 bytes</p>
+  </section>
+
+  <section>
+    <h2>Watch face</h2>
+    <div class="grid4">
+      <button data-face="1" data-conn>1</button>
+      <button data-face="2" data-conn>2</button>
+      <button data-face="3" data-conn>3</button>
+      <button data-face="4" data-conn>4</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Settings</h2>
+    <div class="grid">
+      <button data-cmd="17" data-arg="00" data-conn>Time format 00</button>
+      <button data-cmd="17" data-arg="01" data-conn>Time format 01</button>
+      <button data-cmd="1A" data-arg="00" data-conn>Units 00</button>
+      <button data-cmd="1A" data-arg="01" data-conn>Units 01</button>
+    </div>
+    <label for="goal">Daily step goal</label>
+    <div class="row">
+      <input id="goal" type="number" inputmode="numeric" value="8000" min="1" max="100000" data-conn>
+      <button id="goalBtn" data-conn>Set goal</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="timeBtn" data-conn>Sync time from this device</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Health</h2>
+    <div class="grid">
+      <button id="hrBtn" data-conn>Live heart rate</button>
+      <button data-cmd="59" data-arg="00" data-conn>Today's steps</button>
+      <button data-cmd="6B" data-arg="00" data-conn>Start SpO2</button>
+      <button data-cmd="6B" data-arg="FF" data-conn>Stop SpO2</button>
+      <button data-cmd="69" data-arg="000000" data-conn>Start BP</button>
+      <button data-cmd="69" data-arg="FFFFFF" data-conn>Stop BP</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ask the watch</h2>
+    <div class="grid">
+      <button data-cmd="2E" data-conn>Version</button>
+      <button data-cmd="25" data-arg="FF" data-conn>Features</button>
+      <button data-cmd="29" data-conn>Watch face</button>
+      <button data-cmd="2B" data-conn>Language</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Raw packet</h2>
+    <textarea id="raw" placeholder="61   (or a full packet like FE EA 20 05 61)" data-conn></textarea>
+    <label class="check"><input type="checkbox" id="autoHeader" checked> Add FE EA header and size for me (enter command + payload)</label>
+    <label class="check"><input type="checkbox" id="allowRisky"> <span class="warn">Allow risky commands (51 shutdown, 63 firmware, 6E/74 file transfer)</span></label>
+    <div class="row" style="margin-top:10px"><button id="rawBtn" data-conn>Send raw</button></div>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <pre id="log"></pre>
+    <div class="row" style="margin-top:10px"><button id="clearBtn">Clear log</button></div>
+  </section>
+</main>
+
+<script>
+const SVC = 0xfeea, CMD = 0xfee2, RX = [0xfee1, 0xfee3];
+const RISKY = [0x51, 0x63, 0x6e, 0x74];
+const NAMES = {0x16:'step goal',0x17:'time format',0x19:'watch face set',0x1A:'units',0x25:'features',0x26:'step goal',
+  0x29:'watch face',0x2B:'language',0x2E:'version',0x31:'time',0x41:'message',0x59:'steps',0x61:'find',0x69:'blood pressure',0x6B:'SpO2'};
+
+let device = null, cmdChr = null, hrChr = null, hrOn = false, writeNoResp = true, rxBuf = [];
+const $ = id => document.getElementById(id);
+const toHex = b => Array.from(b, x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function log(msg, cls) {
+  const d = document.createElement('div');
+  d.textContent = new Date().toLocaleTimeString() + '  ' + msg;
+  if (cls) d.className = cls;
+  $('log').prepend(d);
+}
+
+function parseHex(str) {
+  const clean = str.replace(/0x/gi, '').replace(/[^0-9a-f]/gi, '');
+  if (clean.length % 2) throw new Error('Odd number of hex digits');
+  const out = [];
+  for (let i = 0; i < clean.length; i += 2) out.push(parseInt(clean.substr(i, 2), 16));
+  return out;
+}
+
+function setConnected(on) {
+  $('dot').classList.toggle('on', on);
+  $('statusText').textContent = on ? 'Connected' + (device && device.name ? ' · ' + device.name : '') : 'Disconnected';
+  $('connectBtn').disabled = on;
+  $('disconnectBtn').disabled = !on;
+  document.querySelectorAll('[data-conn]').forEach(el => el.disabled = !on);
+  if (!on) { $('battery').textContent = '–'; $('hr').textContent = '–'; hrOn = false; $('hrBtn').textContent = 'Live heart rate'; }
+}
+
+function buildPacket(cmd, payload = []) {
+  const total = 5 + payload.length;
+  return new Uint8Array([0xFE, 0xEA, 0x20 + ((total >> 8) & 0xFF), total & 0xFF, cmd, ...payload]);
+}
+
+async function writeBytes(bytes) {
+  if (!cmdChr) throw new Error('Not connected');
+  for (let off = 0; off < bytes.length; off += 20) {
+    const chunk = bytes.slice(off, off + 20);
+    if (writeNoResp && cmdChr.writeValueWithoutResponse) {
+      try { await cmdChr.writeValueWithoutResponse(chunk); }
+      catch (e) { writeNoResp = false; await cmdChr.writeValue(chunk); }
+    } else {
+      await cmdChr.writeValue(chunk);
+    }
+    await sleep(25);
+  }
+  log('→ ' + toHex(bytes));
+}
+
+async function send(cmd, payload = []) {
+  try { await writeBytes(buildPacket(cmd, payload)); }
+  catch (e) { log('✕ ' + e.message, 'warn'); }
+}
+
+function printable(bytes) {
+  if (!bytes.length) return '';
+  const s = new TextDecoder().decode(new Uint8Array(bytes));
+  const ok = [...s].filter(c => c >= ' ' && c !== '\uFFFD').length;
+  return ok / [...s].length > 0.8 ? s : '';
+}
+
+function handlePacket(p) {
+  const cmd = p[4], data = p.slice(5);
+  const name = NAMES[cmd] ? ' (' + NAMES[cmd] + ')' : '';
+  let extra = '';
+  if (cmd === 0x29 && data.length) extra = ' → face ' + data[0];
+  else if ((cmd === 0x16 || cmd === 0x26) && data.length >= 4) extra = ' → ' + ((data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]) >>> 0) + ' steps';
+  else { const t = printable(data); if (t) extra = ' → "' + t + '"'; }
+  log('← ' + toHex(p) + '  cmd ' + cmd.toString(16).toUpperCase().padStart(2, '0') + name + extra, 'ok');
+}
+
+function onRx(e) {
+  const dv = e.target.value;
+  const v = Array.from(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
+  if (v[0] === 0xFE && v[1] === 0xEA) rxBuf = [];
+  rxBuf.push(...v);
+  if (rxBuf.length >= 4 && rxBuf[0] === 0xFE && rxBuf[1] === 0xEA && rxBuf[2] >= 0x20) {
+    const need = ((rxBuf[2] - 0x20) << 8) | rxBuf[3];
+    if (rxBuf.length >= need) { handlePacket(rxBuf.slice(0, need)); rxBuf = []; }
+  } else {
+    log('← ' + toHex(v));
+    rxBuf = [];
+  }
+}
+
+function setBattery(v) { $('battery').textContent = v + '%'; }
+
+async function connect() {
+  if (!navigator.bluetooth) {
+    log('No Web Bluetooth in this browser. On iPhone use Bluefy; on Android or desktop use Chrome.', 'warn');
+    return;
+  }
+  try {
+    const prefix = $('name').value.trim() || 'DRIFT';
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: prefix }, { services: [SVC] }],
+      optionalServices: [SVC, 0x180f, 0x180d]
+    });
+    device.addEventListener('gattserverdisconnected', () => { cmdChr = null; hrChr = null; setConnected(false); log('Disconnected', 'warn'); });
+    log('Connecting to ' + (device.name || 'device') + '…');
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC);
+    cmdChr = await svc.getCharacteristic(CMD);
+    for (const u of RX) {
+      try {
+        const c = await svc.getCharacteristic(u);
+        await c.startNotifications();
+        c.addEventListener('characteristicvaluechanged', onRx);
+      } catch (e) { log('Could not subscribe to ' + u.toString(16).toUpperCase() + ': ' + e.message, 'warn'); }
+    }
+    try {
+      const bc = await (await server.getPrimaryService(0x180f)).getCharacteristic(0x2a19);
+      setBattery((await bc.readValue()).getUint8(0));
+      await bc.startNotifications();
+      bc.addEventListener('characteristicvaluechanged', e => setBattery(e.target.value.getUint8(0)));
+    } catch (e) { /* battery optional */ }
+    try {
+      hrChr = await (await server.getPrimaryService(0x180d)).getCharacteristic(0x2a37);
+      hrChr.addEventListener('characteristicvaluechanged', e => {
+        const v = e.target.value, flags = v.getUint8(0);
+        $('hr').textContent = (flags & 1 ? v.getUint16(1, true) : v.getUint8(1)) + ' bpm';
+      });
+    } catch (e) { hrChr = null; }
+    setConnected(true);
+    log('Connected', 'ok');
+  } catch (e) {
+    log('✕ ' + e.message, 'warn');
+    setConnected(false);
+  }
+}
+
+async function toggleHr() {
+  if (!hrChr) { log('Heart rate service not available', 'warn'); return; }
+  try {
+    if (hrOn) { await hrChr.stopNotifications(); hrOn = false; $('hrBtn').textContent = 'Live heart rate'; $('hr').textContent = '–'; }
+    else { await hrChr.startNotifications(); hrOn = true; $('hrBtn').textContent = 'Stop heart rate'; }
+  } catch (e) { log('✕ ' + e.message, 'warn'); }
+}
+
+function updateMsgInfo() {
+  const n = new TextEncoder().encode($('msgText').value).length;
+  const total = 6 + n;
+  $('msgInfo').textContent = n + ' text bytes · packet ' + total + ' bytes' + (total > 240 ? ' — long messages may get cut off' : '');
+}
+
+function sendMessage() {
+  const text = $('msgText').value;
+  if (!text) { log('Type a message first', 'warn'); return; }
+  send(0x41, [parseInt($('msgType').value, 10), ...new TextEncoder().encode(text)]);
+}
+
+// Da Fit style: timestamp shifted so the watch (which assumes UTC+8) shows your local wall-clock time
+function syncTime() {
+  const now = Date.now();
+  const localOffsetSec = -new Date().getTimezoneOffset() * 60;
+  const t = Math.floor(now / 1000) + localOffsetSec - 8 * 3600;
+  send(0x31, [(t >>> 24) & 255, (t >>> 16) & 255, (t >>> 8) & 255, t & 255, 8]);
+}
+
+function setGoal() {
+  const g = Math.max(1, Math.min(100000, parseInt($('goal').value, 10) || 0));
+  send(0x16, [(g >>> 24) & 255, (g >>> 16) & 255, (g >>> 8) & 255, g & 255]);
+}
+
+async function sendRaw() {
+  let bytes;
+  try { bytes = parseHex($('raw').value); } catch (e) { log('✕ ' + e.message, 'warn'); return; }
+  if (!bytes.length) return;
+  const packet = $('autoHeader').checked ? buildPacket(bytes[0], bytes.slice(1)) : new Uint8Array(bytes);
+  const cmd = packet.length > 4 && packet[0] === 0xFE && packet[1] === 0xEA ? packet[4] : null;
+  if (cmd !== null && RISKY.includes(cmd) && !$('allowRisky').checked) {
+    log('Blocked risky command ' + cmd.toString(16).toUpperCase() + '. Tick "Allow risky" if you really mean it.', 'warn');
+    return;
+  }
+  try { await writeBytes(packet); } catch (e) { log('✕ ' + e.message, 'warn'); }
+}
+
+$('connectBtn').onclick = connect;
+$('disconnectBtn').onclick = () => device && device.gatt.connected && device.gatt.disconnect();
+$('sendMsgBtn').onclick = sendMessage;
+$('endCallBtn').onclick = () => send(0x41, [0xFF]);
+$('buzzBtn').onclick = () => send(0x61);
+$('timeBtn').onclick = syncTime;
+$('goalBtn').onclick = setGoal;
+$('hrBtn').onclick = toggleHr;
+$('rawBtn').onclick = sendRaw;
+$('clearBtn').onclick = () => { $('log').textContent = ''; };
+$('msgText').addEventListener('input', updateMsgInfo);
+document.querySelectorAll('[data-face]').forEach(b => b.onclick = () => send(0x19, [parseInt(b.dataset.face, 10)]));
+document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(parseInt(b.dataset.cmd, 16), b.dataset.arg ? parseHex(b.dataset.arg) : []));
+
+setConnected(false);
+updateMsgInfo();
+if (!navigator.bluetooth) log('No Web Bluetooth here. Open this page in Bluefy (iPhone) or Chrome (Android/desktop).', 'warn');
+</script>
+</body>
+</html>
