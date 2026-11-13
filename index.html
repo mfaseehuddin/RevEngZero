@@ -217,10 +217,11 @@ label.check input{width:auto;min-height:0}
     <div class="grid4">
       <button data-preset="ack,180,1">Safe</button>
       <button data-preset="ack,180,2">Fast</button>
-      <button data-preset="ack,180,4">Faster</button>
-      <button data-preset="ack,244,4">Turbo</button>
+      <button data-preset="ack,244,2">Faster</button>
+      <button data-preset="ack,244,4">Turbo ✗</button>
     </div>
     <p id="faceEta" class="hint"></p>
+    <label class="check"><input type="checkbox" id="faceAutoRetry" checked> If the watch reports a damaged copy, retry automatically at Safe speed</label>
     <div class="row" style="margin-top:12px">
       <button id="faceUploadBtn" class="primary" data-conn>Upload to watch</button>
       <button id="faceDownloadBtn">Download .bin</button>
@@ -383,7 +384,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.10.1';
+const APP_VERSION = '0.10.2';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -866,7 +867,7 @@ function crcCcitt(bytes, seed) {
   return c;
 }
 
-async function uploadFace() {
+async function uploadFace(opts = {}) {
   if (!cmdChr) { $('faceInfo').textContent = 'Connect to the watch first.'; return; }
   if (!fileChr) { $('faceInfo').textContent = 'This watch has no FEE6 data channel, so custom faces can\'t be uploaded.'; return; }
   if ($('faceDesign').value === 'image' && !faceImg) { $('faceInfo').textContent = 'Pick an image first.'; return; }
@@ -880,10 +881,11 @@ async function uploadFace() {
   const bin = buildFaceBin();
   const size = bin.length;
   const ackMode = $('faceMode').value === 'ack';
-  const chunk = parseInt($('faceChunk').value, 10) || 180;
+  const chunk = opts.chunk || parseInt($('faceChunk').value, 10) || 180;
   const delay = ackMode ? 0 : Math.max(0, parseInt($('faceDelay').value, 10) || 0);
   const pauseMs = ackMode ? 0 : Math.max(0, parseInt($('facePause').value, 10) || 0);
-  const windowN = Math.max(1, Math.min(16, parseInt($('faceWindow').value, 10) || 1));
+  const windowN = opts.windowN || Math.max(1, Math.min(16, parseInt($('faceWindow').value, 10) || 1));
+  let retrySlower = false;
   const startWait = Math.max(0, parseInt($('faceStartWait').value, 10) || 0);
   const total = Math.ceil(size / chunk);
   const info = $('faceInfo'), bar = $('faceProgress');
@@ -960,12 +962,15 @@ async function uploadFace() {
       await sleep(50);
     }
     if (faceDoneCrc != null) {
-      const cands = { 'CRC FEEA': crcFeea(bin), 'CRC-CCITT': crcCcitt(bin, 0xFFFF), 'CRC XModem': crcCcitt(bin, 0) };
-      const hit = Object.entries(cands).find(([, v]) => v === faceDoneCrc);
-      check = hit ? ' ✓ Checksum matches (' + hit[0] + '), every byte arrived intact.' :
-        ' ⚠ Checksum mismatch — the image may be damaged. Watch ' + faceDoneCrc.toString(16).toUpperCase().padStart(4, '0') + ' (ours: ' +
-        Object.entries(cands).map(([k, v]) => k + ' ' + v.toString(16).toUpperCase().padStart(4, '0')).join(', ') + ').';
-      log('Transfer complete, watch checksum ' + faceDoneCrc.toString(16).toUpperCase().padStart(4, '0') + (hit ? ' = ' + hit[0] : ''), hit ? 'ok' : '');
+      // Confirmed: the watch reads the image back and returns CRC-16 seeded 0xFEEA (0000 = verification failed)
+      const ours = crcFeea(bin), hex4 = v => v.toString(16).toUpperCase().padStart(4, '0');
+      log('Transfer complete, watch checksum ' + hex4(faceDoneCrc) + ', ours ' + hex4(ours), faceDoneCrc === ours ? 'ok' : 'warn');
+      if (faceDoneCrc !== ours) {
+        retrySlower = $('faceAutoRetry').checked && !opts.retry && (windowN > 1 || chunk > 180);
+        throw new Error('The watch saved a damaged copy (its checksum ' + hex4(faceDoneCrc) + ' ≠ ' + hex4(ours) +
+          '): data was sent faster than its flash could store it. Your old face is kept.' + (retrySlower ? ' Retrying at Safe speed…' : (windowN === 1 && chunk <= 180 ? ' Even Safe was too fast this time: switch Pacing to "Fixed delays (old)", which is slower but proven.' : ' Try a slower preset.')));
+      }
+      check = ' ✓ Verified by the watch (checksum ' + hex4(ours) + ').';
     } else if (acked) {
       const got = Math.max(0, faceAckCount);
       throw new Error(got >= total
@@ -981,7 +986,7 @@ async function uploadFace() {
     await sleep(500);
     if (faceRejected) throw new Error('The watch rejected the file at the end (checksum or format).');
     bar.value = 100;
-    info.textContent = 'Done in ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s.' + check;
+    info.textContent = 'Done in ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s' + (opts.retry ? ' (retried at Safe speed)' : '') + '.' + check;
     log('Custom face uploaded (' + size + ' bytes, ' + total + ' packets of ' + chunk + ', ' +
       (acked ? 'ack mode, window ' + windowN : 'timed ' + useDelay + ' ms') + ')', 'ok');
   } catch (e) {
@@ -1000,6 +1005,10 @@ async function uploadFace() {
     }, null, 1);
     $('faceTraceBtn').style.display = '';
     $('faceTraceBtn').textContent = 'Copy upload trace (' + tr.length + ' replies)';
+  }
+  if (retrySlower && cmdChr) {
+    await sleep(1500);
+    await uploadFace({ retry: true, windowN: 1, chunk: 180 });
   }
 }
 
