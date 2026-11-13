@@ -148,6 +148,7 @@ label.check input{width:auto;min-height:0}
     <label class="check" style="justify-content:center;margin-top:0"><input type="checkbox" id="faceShowClock" checked> Preview the watch's clock (not uploaded)</label>
     <label for="faceDesign">Design</label>
     <select id="faceDesign">
+      <option value="sunset" selected>Mirage · Sunset</option>
       <option value="horizon">Mirage · Horizon</option>
       <option value="bold">Mirage · Bold</option>
       <option value="image">Your own image</option>
@@ -157,7 +158,32 @@ label.check input{width:auto;min-height:0}
       <label for="faceImage">Image</label>
       <input type="file" id="faceImage" accept="image/*">
     </div>
-    <div class="grid" style="margin-top:2px">
+    <div id="sunsetRow">
+      <div class="grid" style="margin-top:2px">
+        <div>
+          <label for="sunLayout">Layout</label>
+          <select id="sunLayout">
+            <option value="A">A · Moon, top/option>
+            <option value="B">B · Sun, bottom/option>
+          </select>
+        </div>
+        <div>
+          <label for="sunPalette">Palette</label>
+          <select id="sunPalette">
+            <option value="rose">Rose Dusk</option>
+            <option value="lavender">Lavender Haze</option>
+            <option value="peach">Peach Fizz</option>
+            <option value="tangerine">Tangerine</option>
+            <option value="marigold">Marigold</option>
+            <option value="berry">Berry</option>
+            <option value="mauve">Dusty Mauve</option>
+            <option value="coral">Coral Tide</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint" style="margin:6px 0 0">The watch draws the clock itself. Choosing a design sets the Clock layout below to match (position and color); after uploading, press <b>Apply to watch</b> there.</p>
+    </div>
+    <div class="grid" id="classicRow" style="margin-top:2px">
       <div>
         <label for="faceAccent">Accent</label>
         <select id="faceAccent">
@@ -400,7 +426,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.12.0';
+const APP_VERSION = '0.13.0';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -777,13 +803,96 @@ function drawTest(x) {
   x.strokeStyle = '#00ff00'; x.lineWidth = 2; x.strokeRect(1, 1, FACE_W - 2, FACE_H - 2);
 }
 
+// ---- Mirage · Sunset (layouts A/B × 8 palettes) ----
+const SUNSET = {
+  rose:      { top: '#1b0d2c', mid: '#6a2463', bot: '#ff7a8f', moon: '#ffe0d6', glow: 'rgba(255,190,200,.2)', dune: '#24102c', pool: '#ffa3b5', word: '#ffc9d3', clock: '#fff1ee' },
+  lavender:  { top: '#16122b', mid: '#54457f', bot: '#f2a7c9', moon: '#fff0f6', glow: 'rgba(255,220,240,.2)', dune: '#1a1430', pool: '#f7b6d6', word: '#f7c9df', clock: '#fff4fa' },
+  peach:     { top: '#25102f', mid: '#9c3f68', bot: '#ffb48a', moon: '#fff1e6', glow: 'rgba(255,210,180,.22)', dune: '#260d29', pool: '#ffc6a1', word: '#ffd3b8', clock: '#fff4ec' },
+  tangerine: { top: '#170910', mid: '#6e1a2b', bot: '#ff8c42', moon: '#ffe2bd', glow: 'rgba(255,170,100,.22)', dune: '#1a090f', pool: '#ffa25c', word: '#ffbd8a', clock: '#fff0e0' },
+  marigold:  { top: '#0f132b', mid: '#463978', bot: '#ffc857', moon: '#fff6d6', glow: 'rgba(255,230,150,.2)', dune: '#121027', pool: '#ffd77a', word: '#ffe3a3', clock: '#fff8e6' },
+  berry:     { top: '#140820', mid: '#651c58', bot: '#ff5e87', moon: '#ffd6e3', glow: 'rgba(255,150,190,.22)', dune: '#1a0a22', pool: '#ff8fb0', word: '#ffb6cb', clock: '#fff0f5' },
+  mauve:     { top: '#1f1626', mid: '#76506f', bot: '#f2a097', moon: '#fde6df', glow: 'rgba(250,200,190,.2)', dune: '#211828', pool: '#f7b8ad', word: '#f6c9c1', clock: '#fff3ef' },
+  coral:     { top: '#0b1a24', mid: '#24314f', bot: '#ff6f61', moon: '#ffd1c4', glow: 'rgba(255,140,120,.2)', dune: '#0d141f', pool: '#ff8c7a', word: '#ffb3a6', clock: '#ffe4dc' }
+};
+
+function sdGlow(x, cx, cy, r0, r1, color) {
+  const g = x.createRadialGradient(cx, cy, r0, cx, cy, r1);
+  g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.fillRect(0, 0, FACE_W, FACE_H);
+}
+function sdCrescent(x, cx, cy, r, color, glow) {
+  sdGlow(x, cx, cy, r * 0.6, r * 3.2, glow);
+  const c = document.createElement('canvas'); c.width = c.height = r * 2 + 4;   // cut out on its own canvas
+  const m = c.getContext('2d');
+  m.fillStyle = color; m.beginPath(); m.arc(r + 2, r + 2, r, 0, 7); m.fill();
+  m.globalCompositeOperation = 'destination-out';
+  m.beginPath(); m.arc(r + 2 + r * 0.42, r + 2 - r * 0.28, r * 0.9, 0, 7); m.fill();
+  x.drawImage(c, cx - r - 2, cy - r - 2);
+}
+function sdSun(x, cx, cy, r, color, glow) {
+  sdGlow(x, cx, cy, r * 0.8, r * 3, glow);
+  x.fillStyle = color; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
+}
+function sdDune(x, base, color, phase) {
+  x.beginPath(); x.moveTo(0, FACE_H);
+  for (let i = 0; i <= FACE_W; i += 2) x.lineTo(i, base - 14 * Math.sin(i / 70 + phase) - 5 * Math.sin(i / 23 + phase * 2));
+  x.lineTo(FACE_W, FACE_H); x.closePath(); x.fillStyle = color; x.fill();
+}
+function sdMirage(x, cx, y, w, color) {
+  const g = x.createRadialGradient(cx, y, 0, cx, y, w / 2);
+  g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.save(); x.globalAlpha = 0.55; x.fillStyle = g;
+  x.beginPath(); x.ellipse(cx, y, w / 2, 5, 0, 0, 7); x.fill(); x.restore();
+  x.save(); x.strokeStyle = color; x.lineWidth = 1.4; x.lineCap = 'round';
+  [[0, w * 0.62, 0.95], [6, w * 0.4, 0.6]].forEach(([dy, l, a]) => {
+    x.globalAlpha = a; x.beginPath();
+    for (let k = 0; k <= l; k += 2) { const px = cx - l / 2 + k, py = y + dy + Math.sin(k / 7) * 1.2; k ? x.lineTo(px, py) : x.moveTo(px, py); }
+    x.stroke();
+  });
+  x.restore();
+}
+function sdWordmark(x, color, y) {
+  x.save(); x.fillStyle = color; x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  x.font = '700 10px -apple-system, "Helvetica Neue", Arial, sans-serif';
+  let px = 18;
+  for (const c of 'MIRAGE') { x.fillText(c, px, y); px += x.measureText(c).width + 4.2; }
+  x.restore();
+}
+function drawSunset(x, layout, p) {
+  const g = x.createLinearGradient(0, 0, 0, FACE_H);
+  g.addColorStop(0, p.top); g.addColorStop(0.62, p.mid); g.addColorStop(1, p.bot);
+  x.fillStyle = g; x.fillRect(0, 0, FACE_W, FACE_H);
+  if (layout === 'B') {
+    sdSun(x, 70, 150, 18, p.moon, p.glow);
+    sdMirage(x, 70, 164, 80, p.pool);
+    sdDune(x, 186, p.dune, 0.6);
+    sdWordmark(x, p.word, 28);
+  } else {
+    sdCrescent(x, 62, 66, 16, p.moon, p.glow);
+    sdMirage(x, 120, 208, 110, p.pool);
+    sdDune(x, 238, p.dune, 0.6);
+    sdWordmark(x, p.word, FACE_H - 20);
+  }
+}
+// Point the Clock layout editor at the design's clock, so the preview (and Apply) match
+function matchSunsetClock() {
+  if ($('faceDesign').value !== 'sunset') return;
+  $('lyPos').value = $('sunLayout').value === 'B' ? '1' : '0';
+  $('lyColor').value = SUNSET[$('sunPalette').value].clock;
+  $('lyTop').value = '0';
+  $('lyBottom').value = '1';
+}
+
 function drawFace() {
   const design = $('faceDesign').value, acc = $('faceAccent').value, pos = $('faceBrandPos').value;
   $('faceImageRow').style.display = design === 'image' ? 'block' : 'none';
+  $('sunsetRow').style.display = design === 'sunset' ? 'block' : 'none';
+  $('classicRow').style.display = design === 'sunset' ? 'none' : '';
   ['faceAccent', 'faceBrandPos'].forEach(id => $(id).disabled = design === 'image' || design === 'test');
   const x = $('faceCanvas').getContext('2d');
   x.save();
-  if (design === 'image') drawImage(x);
+  if (design === 'sunset') drawSunset(x, $('sunLayout').value, SUNSET[$('sunPalette').value]);
+  else if (design === 'image') drawImage(x);
   else if (design === 'test') drawTest(x);
   else if (design === 'bold') drawBold(x, acc, pos);
   else drawHorizon(x, acc, pos);
@@ -833,7 +942,7 @@ function downloadFace() {
 function setFaceBusy(on) {
   faceBusy = on;
   $('faceUploadBtn').textContent = on ? 'Stop' : 'Upload to watch';
-  ['faceDesign', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay', 'faceStartWait', 'facePause', 'faceMode', 'faceWindow', 'faceRate', 'faceSlot'].forEach(id => $(id).disabled = on);
+  ['faceDesign', 'sunLayout', 'sunPalette', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay', 'faceStartWait', 'facePause', 'faceMode', 'faceWindow', 'faceRate', 'faceSlot'].forEach(id => $(id).disabled = on);
   $('faceTuneBtn').disabled = on;
   document.querySelectorAll('[data-preset]').forEach(b => b.disabled = on);
 }
@@ -1681,7 +1790,11 @@ $('dumpSaveBtn').onclick = saveDump;
 $('typeTestBtn').onclick = testNextType;
 $('faceUploadBtn').onclick = () => faceBusy ? (faceAbort = true) : uploadFace();
 $('faceDownloadBtn').onclick = downloadFace;
-['faceDesign', 'faceAccent', 'faceBrandPos'].forEach(id => $(id).addEventListener('change', drawFace));
+['faceDesign', 'faceAccent', 'faceBrandPos', 'sunLayout', 'sunPalette'].forEach(id => $(id).addEventListener('change', () => {
+  matchSunsetClock();
+  savePref('faceLook', [$('faceDesign').value, $('sunLayout').value, $('sunPalette').value].join(','));
+  drawFace();
+}));
 $('faceImage').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0];
   if (!f) return;
@@ -1718,6 +1831,15 @@ document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(pars
     if (r != null) $('faceRate').value = r; if (sl != null) $('faceSlot').value = sl;
   } else { $('faceMode').value = 'ack'; $('faceChunk').value = '244'; $('faceWindow').value = '1'; $('faceRate').value = '0'; }
 })();
+{
+  const look = (loadPref('faceLook') || '').split(',');
+  if (look.length === 3) {
+    if ([...$('faceDesign').options].some(o => o.value === look[0])) $('faceDesign').value = look[0];
+    if (['A', 'B'].includes(look[1])) $('sunLayout').value = look[1];
+    if (SUNSET[look[2]]) $('sunPalette').value = look[2];
+  }
+  matchSunsetClock();
+}
 drawFace();
 updateFaceEta();
 $('appVersion').textContent = 'v' + APP_VERSION + ' · ' + APP_BUILD;
