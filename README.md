@@ -45,7 +45,7 @@ The watch reports its face size in the reply to `39`; on the Drift it is **240×
 3. Image data to `FEE6` (write without response): background 240×280 then preview 140×163, RGB565 big-endian, row by row
    - **128-byte chunks, 80 ms apart**: faster and the watch drops packets
    - **A short pause every 4 KB** (40 ms confirmed working): the watch can drop a packet while flushing each block to flash
-4. `FE EA 20 09 6E 00 00 00 00` (finish), `FE EA 20 05 29`, `FE EA 20 06 19 01` (show photo face)
+4. `FE EA 20 09 6E 00 00 00 00` (finish), `FE EA 20 05 29`, then `19 nn` to show the photo face. On the Drift the photo face is **slot 2**; DaFup's `19 01` switches to the stock face instead.
 
 **Update:** the watch *does* acknowledge. On `FEE3` it replies `6E 00 00` when ready (about 2.3 s after start), then `6E nn nn` with the running count of packets received after every `FEE6` write, and finally `6E FF FF cc cc`: the watch reads the image back from flash and returns its CRC-16 (seeded `0xFEEA`, same as kabbi's notes), or `00 00` if verification failed. At ~9.7 KB/s (244-byte packets, 4 in flight) every packet was acknowledged but the stored copy was corrupted, so the real limit is flash write speed, not Bluetooth. Pacing on these replies replaces the fixed delays. A dropped packet shows up as the count falling behind, and the checksum confirms the stored image. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
 
@@ -95,6 +95,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.11.0 | Speed limit (KB/s) and "Find fastest safe speed" auto-tuning, verified by the watch's checksum; photo face slot setting (default 2; was switching to face 1, the stock face) |
 | 0.10.2 | Watch checksum confirmed as CRC-16 seeded 0xFEEA; a mismatch (or 0000) now cancels the upload, keeps the old face and retries at Safe speed |
 | 0.10.1 | Correct message when the watch counts every packet but never confirms the file (data lost while saving); wait up to 8 s for confirmation |
 | 0.10.0 | Ack-driven face upload: waits for the watch's ready signal, paces on its per-packet acknowledgements, verifies the final checksum |
