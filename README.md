@@ -22,7 +22,9 @@ Write packets to `0xFEE2`; replies notify on `0xFEE1` / `0xFEE3`.
 FE EA  20+sizeHi  sizeLo  CMD  PAYLOAD...
 ```
 
-Size counts every byte. Confirmed working:
+Size counts every byte. The watch reports its face size in the reply to `39`: `… 00 F0 00 8C 01 18 00 A3 FF` = 240 wide, 140 preview wide, 280 high, 163 preview high.
+
+Confirmed working:
 
 | Packet | Effect |
 |---|---|
@@ -40,6 +42,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.6.0 | Face size read from the watch (cmd 39 → 240×280, preview 140×163) instead of the spec-sheet 240×296; test pattern; 30 ms default chunk delay |
 | 0.5.0 | Custom face designer and uploader (Mirage Horizon / Bold / your own image, 240×296 RGB565 via FEE6); Dump-for-Claude report; message icon tester (08 = WhatsApp) |
 | 0.4.0 | Version label; Bluefy connect fix (full UUIDs, single picker call, readable errors); diagnostics and nearby-device scan |
 | 0.1.0 | First web app, ESP32 sketch, protocol notes |

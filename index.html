@@ -140,13 +140,14 @@ label.check input{width:auto;min-height:0}
 
   <section>
     <h2>Custom face</h2>
-    <canvas id="faceCanvas" width="240" height="296" style="display:block;margin:0 auto 4px;width:180px;height:222px;border-radius:30px;border:6px solid #2a2d35;background:#000"></canvas>
-    <p class="hint" style="text-align:center;margin-top:4px">240 × 296 · the watch draws the time on top</p>
+    <canvas id="faceCanvas" width="240" height="280" style="display:block;margin:0 auto 4px;width:180px;height:210px;border-radius:30px;border:6px solid #2a2d35;background:#000"></canvas>
+    <p id="faceSizeHint" class="hint" style="text-align:center;margin-top:4px">240 × 280 (default) · the watch draws the time on top</p>
     <label for="faceDesign">Design</label>
     <select id="faceDesign">
       <option value="horizon">Mirage · Horizon</option>
       <option value="bold">Mirage · Bold</option>
       <option value="image">Your own image</option>
+      <option value="test">Test pattern (diagnostics)</option>
     </select>
     <div id="faceImageRow" style="display:none">
       <label for="faceImage">Image</label>
@@ -185,7 +186,7 @@ label.check input{width:auto;min-height:0}
         </div>
         <div>
           <label for="faceDelay">Delay per chunk (ms)</label>
-          <input id="faceDelay" type="number" inputmode="numeric" value="20" min="0" max="500">
+          <input id="faceDelay" type="number" inputmode="numeric" value="30" min="0" max="500">
         </div>
       </div>
     </details>
@@ -268,7 +269,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 const KNOWN_MSG_TYPES = {0x01: 'Message/SMS', 0x08: 'WhatsApp'};
 const APP_BUILD = '2026-11-13';
 
@@ -355,6 +356,13 @@ function printable(bytes) {
 function handlePacket(p) {
   const cmd = p[4], data = p.slice(5);
   if (dumpCollector) dumpCollector.push(toHex(p));
+  if (cmd === 0x39) {
+    const L = parseLayout(data);
+    if (L && (L.w !== FACE_W || L.h !== FACE_H || L.pw !== PREV_W || L.ph !== PREV_H || !faceSizeFromWatch)) {
+      setFaceSize(L.w, L.h, L.pw, L.ph, true);
+      log('Watch face size from watch: ' + L.w + '×' + L.h + ', preview ' + L.pw + '×' + L.ph, 'ok');
+    }
+  }
   if ((cmd === 0x6E || cmd === 0x74) && data.length && data.every(b => b === 0xFF)) faceRejected = true;
   const name = NAMES[cmd] ? ' (' + NAMES[cmd] + ')' : '';
   let extra = '';
@@ -449,6 +457,7 @@ async function connectTo(dev) {
       });
     } catch (e) { hrChr = null; }
     setConnected(true);
+    setTimeout(() => { if (cmdChr) send(0x39); }, 300); // learn the face size
     connectMsg('Connected to ' + (device.name || 'device') + ' — ready.', 'ok');
   } catch (e) {
     connectMsg('✕ Connection failed: ' + errText(e), 'warn');
@@ -462,7 +471,30 @@ async function connectTo(dev) {
 // Format (same as DaFbc / DaFup for MoYoung v2, 240x296 screens):
 //   background 240x296 RGB565 big-endian, then preview 140x163 RGB565 big-endian.
 // Upload: FEE2 <- 6E + size(4, BE); data -> FEE6 in chunks; FEE2 <- 6E 00000000; 29; 19 01.
-const FACE_W = 240, FACE_H = 296, PREV_W = 140, PREV_H = 163;
+// Defaults match this watch's own layout reply (cmd 39): 240x280 screen, 140x163 preview.
+let FACE_W = 240, FACE_H = 280, PREV_W = 140, PREV_H = 163, faceSizeFromWatch = false;
+
+function setFaceSize(w, h, pw, ph, fromWatch) {
+  FACE_W = w; FACE_H = h; PREV_W = pw; PREV_H = ph;
+  if (fromWatch) faceSizeFromWatch = true;
+  const c = $('faceCanvas');
+  c.width = w; c.height = h;
+  c.style.height = Math.round(180 * h / w) + 'px';
+  $('faceSizeHint').textContent = w + ' × ' + h + (fromWatch ? ' (from the watch)' : ' (default)') + ' · preview ' + pw + ' × ' + ph + ' · the watch draws the time on top';
+  drawFace();
+}
+
+// Cmd 39 reply ends with: bgW(2) prevW(2) bgH(2) prevH(2) FF  — e.g. 00 F0 00 8C 01 18 00 A3 FF
+function parseLayout(data) {
+  let d = data;
+  if (d.length && d[d.length - 1] === 0xFF) d = d.slice(0, -1);
+  if (d.length < 8) return null;
+  const t = d.slice(-8), be = i => (t[i] << 8) | t[i + 1];
+  const w = be(0), pw = be(2), h = be(4), ph = be(6);
+  const ok = (v, lo, hi) => v >= lo && v <= hi;
+  if (!ok(w, 100, 600) || !ok(h, 100, 600) || !ok(pw, 40, w) || !ok(ph, 40, h)) return null;
+  return { w, h, pw, ph };
+}
 let faceImg = null;
 
 function rgba(hex, a) {
@@ -508,7 +540,7 @@ function drawHorizon(x, acc, pos) {
   x.fillStyle = g;
   x.fillRect(0, 0, FACE_W, FACE_H);
 
-  const hy = pos === 'bottom' ? 196 : 214;   // horizon line
+  const hy = pos === 'bottom' ? FACE_H - 100 : FACE_H - 82;   // horizon line
   const cx = FACE_W / 2, r = 40;
 
   // glow
@@ -543,7 +575,7 @@ function drawHorizon(x, acc, pos) {
     wave(x, cx, y, len, 1.6 + i * 0.25, i * 1.3, rgba(acc, 0.55 - i * 0.08), 1.6);
   }
 
-  wordmark(x, acc, pos === 'bottom' ? 262 : 46);
+  wordmark(x, acc, pos === 'bottom' ? FACE_H - 34 : 46);
 }
 
 function drawBold(x, acc, pos) {
@@ -551,19 +583,20 @@ function drawBold(x, acc, pos) {
   x.fillRect(0, 0, FACE_W, FACE_H);
   // giant outlined letters as texture
   x.save();
-  x.font = '900 84px -apple-system, "Helvetica Neue", Arial Black, sans-serif';
+  x.font = '900 ' + Math.round(84 * FACE_H / 296) + 'px -apple-system, "Helvetica Neue", Arial Black, sans-serif';
   x.textAlign = 'center';
   x.textBaseline = 'alphabetic';
   x.lineWidth = 1.3;
   x.strokeStyle = rgba(acc, 0.24);
-  const base = pos === 'bottom' ? [76, 152, 228] : [138, 212, 286];
+  const k = FACE_H / 296;
+  const base = (pos === 'bottom' ? [76, 152, 228] : [138, 212, 286]).map(v => v * k);
   ['MI', 'RA', 'GE'].forEach((t, i) => x.strokeText(t, FACE_W / 2, base[i]));
   x.restore();
   // accent bar
-  const by = pos === 'bottom' ? 236 : 66;
+  const by = pos === 'bottom' ? FACE_H - 60 : 66;
   x.fillStyle = rgba(acc, 0.95);
   x.fillRect(FACE_W / 2 - 18, by, 36, 3);
-  wordmark(x, acc, pos === 'bottom' ? 264 : 40);
+  wordmark(x, acc, pos === 'bottom' ? FACE_H - 32 : 40);
 }
 
 function drawImage(x) {
@@ -581,12 +614,31 @@ function drawImage(x) {
   x.drawImage(faceImg, (FACE_W - w) / 2, (FACE_H - h) / 2, w, h);
 }
 
+function drawTest(x) {
+  const cols = ['#ffffff', '#ffff00', '#00ffff', '#00ff00', '#ff00ff', '#ff0000', '#0000ff', '#000000'];
+  const bw = FACE_W / cols.length, barH = Math.round(FACE_H * 0.5);
+  cols.forEach((c, i) => { x.fillStyle = c; x.fillRect(Math.round(i * bw), 0, Math.ceil(bw), barH); });
+  const g = x.createLinearGradient(0, 0, FACE_W, 0);
+  g.addColorStop(0, '#000'); g.addColorStop(1, '#fff');
+  x.fillStyle = g;
+  x.fillRect(0, barH, FACE_W, Math.round(FACE_H * 0.15));
+  x.fillStyle = '#000';
+  x.fillRect(0, barH + Math.round(FACE_H * 0.15), FACE_W, FACE_H);
+  x.strokeStyle = '#ff0000'; x.lineWidth = 2;
+  x.beginPath(); x.moveTo(0, FACE_H * 0.65); x.lineTo(FACE_W, FACE_H); x.stroke();
+  x.fillStyle = '#fff'; x.font = 'bold 18px -apple-system, Arial, sans-serif'; x.textAlign = 'center';
+  x.fillText(FACE_W + ' × ' + FACE_H, FACE_W / 2, FACE_H * 0.82);
+  x.strokeStyle = '#00ff00'; x.lineWidth = 2; x.strokeRect(1, 1, FACE_W - 2, FACE_H - 2);
+}
+
 function drawFace() {
   const design = $('faceDesign').value, acc = $('faceAccent').value, pos = $('faceBrandPos').value;
   $('faceImageRow').style.display = design === 'image' ? 'block' : 'none';
+  ['faceAccent', 'faceBrandPos'].forEach(id => $(id).disabled = design === 'image' || design === 'test');
   const x = $('faceCanvas').getContext('2d');
   x.save();
   if (design === 'image') drawImage(x);
+  else if (design === 'test') drawTest(x);
   else if (design === 'bold') drawBold(x, acc, pos);
   else drawHorizon(x, acc, pos);
   x.restore();
@@ -642,6 +694,12 @@ async function uploadFace() {
   if (!fileChr) { $('faceInfo').textContent = 'This watch has no FEE6 data channel, so custom faces can\'t be uploaded.'; return; }
   if ($('faceDesign').value === 'image' && !faceImg) { $('faceInfo').textContent = 'Pick an image first.'; return; }
 
+  if (!faceSizeFromWatch) {
+    $('faceInfo').textContent = 'Asking the watch for its face size…';
+    await send(0x39);
+    await sleep(900);
+    if (!faceSizeFromWatch) log('Watch did not report a face size; using ' + FACE_W + '×' + FACE_H, 'warn');
+  }
   const bin = buildFaceBin();
   const size = bin.length;
   const chunk = parseInt($('faceChunk').value, 10) || 180;
