@@ -140,8 +140,12 @@ label.check input{width:auto;min-height:0}
 
   <section>
     <h2>Custom face</h2>
-    <canvas id="faceCanvas" width="240" height="280" style="display:block;margin:0 auto 4px;width:180px;height:210px;border-radius:30px;border:6px solid #2a2d35;background:#000"></canvas>
-    <p id="faceSizeHint" class="hint" style="text-align:center;margin-top:4px">240 × 280 (default) · the watch draws the time on top</p>
+    <div style="position:relative;width:192px;margin:0 auto 4px">
+      <canvas id="faceCanvas" width="240" height="280" style="display:block;width:180px;height:210px;border-radius:30px;border:6px solid #2a2d35;background:#000"></canvas>
+      <canvas id="faceOverlay" width="240" height="280" style="position:absolute;left:6px;top:6px;width:180px;height:210px;border-radius:24px;pointer-events:none"></canvas>
+    </div>
+    <p id="faceSizeHint" class="hint" style="text-align:center;margin-top:4px">240 × 280 (default)</p>
+    <label class="check" style="justify-content:center;margin-top:0"><input type="checkbox" id="faceShowClock" checked> Preview the watch's clock (not uploaded)</label>
     <label for="faceDesign">Design</label>
     <select id="faceDesign">
       <option value="horizon">Mirage · Horizon</option>
@@ -205,6 +209,54 @@ label.check input{width:auto;min-height:0}
     <progress id="faceProgress" max="100" value="0" style="width:100%;margin-top:10px;height:8px"></progress>
     <p class="hint" id="faceInfo"></p>
     <p class="hint">Uploads to the watch's photo-background face and switches to it. If the picture comes out garbled or nothing changes, try a smaller chunk size or a longer delay, or just pick another face — a failed upload doesn't harm the watch.</p>
+
+    <h2 style="margin-top:18px">Clock layout</h2>
+    <p class="hint" style="margin-top:0">Where the watch draws the time on the photo face, and what goes above and below it. The preview above updates as you change these.</p>
+    <div class="grid">
+      <div>
+        <label for="lyPos">Clock position</label>
+        <select id="lyPos">
+          <option value="0">Top</option>
+          <option value="1">Bottom</option>
+        </select>
+      </div>
+      <div>
+        <label for="lyColor">Clock color</label>
+        <input id="lyColor" type="color" value="#ffffff" style="padding:4px;height:44px">
+      </div>
+      <div>
+        <label for="lyTop">Above the clock</label>
+        <select id="lyTop">
+          <option value="0">Nothing</option>
+          <option value="1">Date</option>
+          <option value="2">Sleep</option>
+          <option value="3">Heart rate</option>
+          <option value="4">Steps</option>
+        </select>
+      </div>
+      <div>
+        <label for="lyBottom">Below the clock</label>
+        <select id="lyBottom">
+          <option value="0">Nothing</option>
+          <option value="1" selected>Date</option>
+          <option value="2">Sleep</option>
+          <option value="3">Heart rate</option>
+          <option value="4">Steps</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button data-swatch="#ffffff" style="background:#ffffff;color:#000">White</button>
+      <button data-swatch="#000000" style="background:#000;color:#fff">Black</button>
+      <button data-swatch="#ff7a45" style="background:#ff7a45;color:#000">Sunset</button>
+      <button data-swatch="#8b7bff" style="background:#8b7bff;color:#000">Violet</button>
+    </div>
+    <label class="check"><input type="checkbox" id="lyShort"> Short format (37 bytes, older watches)</label>
+    <div class="row" style="margin-top:10px">
+      <button id="lyReadBtn" data-conn>Read from watch</button>
+      <button id="lyApplyBtn" class="primary" data-conn>Apply to watch</button>
+    </div>
+    <p id="lyInfo" class="hint"></p>
   </section>
 
   <section>
@@ -311,7 +363,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.9.0';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -402,6 +454,7 @@ function handlePacket(p) {
   const cmd = p[4], data = p.slice(5);
   if (dumpCollector) dumpCollector.push(toHex(p));
   if (cmd === 0x39) {
+    onLayoutReply(data);
     const L = parseLayout(data);
     if (L && (L.w !== FACE_W || L.h !== FACE_H || L.pw !== PREV_W || L.ph !== PREV_H || !faceSizeFromWatch)) {
       setFaceSize(L.w, L.h, L.pw, L.ph, true);
@@ -529,6 +582,8 @@ function setFaceSize(w, h, pw, ph, fromWatch) {
   const c = $('faceCanvas');
   c.width = w; c.height = h;
   c.style.height = Math.round(180 * h / w) + 'px';
+  const ov = $('faceOverlay');
+  ov.width = w; ov.height = h; ov.style.height = c.style.height;
   $('faceSizeHint').textContent = w + ' × ' + h + (fromWatch ? ' (from the watch)' : ' (default)') + ' · preview ' + pw + ' × ' + ph + ' · the watch draws the time on top';
   drawFace();
 }
@@ -691,6 +746,7 @@ function drawFace() {
   else if (design === 'bold') drawBold(x, acc, pos);
   else drawHorizon(x, acc, pos);
   x.restore();
+  drawClockOverlay();
 }
 
 function toRgb565BE(src, w, h) {
@@ -1123,6 +1179,101 @@ async function sendWeather(w) {
   $('wxInfo').textContent = $('wxInfo').textContent.replace(/ · sent.*$/, '') + ' · sent ' + new Date().toLocaleTimeString();
 }
 
+
+// ================= Clock layout (cmd 38 set / 39 query) =================
+// Reply data: [position, above, below, colorHi, colorLo (RGB565), md5 x32, then on V2: sizes + FF]
+// position 0 = top, 1 = bottom; content 0 none, 1 date, 2 sleep, 3 heart rate, 4 steps
+let lastLayoutData = null;
+
+const rgb565ToHex = v => '#' + [((v >> 11) & 31) * 255 / 31, ((v >> 5) & 63) * 255 / 63, (v & 31) * 255 / 31]
+  .map(c => Math.round(c).toString(16).padStart(2, '0')).join('');
+function hexToRgb565(h) {
+  const n = parseInt(h.slice(1), 16);
+  return (((n >> 16) & 255) >> 3) << 11 | (((n >> 8) & 255) >> 2) << 5 | ((n & 255) >> 3);
+}
+
+function setSel(id, v) {
+  const el = $(id);
+  if (![...el.options].some(o => o.value === String(v))) {
+    const o = document.createElement('option');
+    o.value = String(v); o.textContent = 'Value ' + v;
+    el.append(o);
+  }
+  el.value = String(v);
+}
+
+function onLayoutReply(data) {
+  if (data.length < 5) return;
+  lastLayoutData = data.slice();
+  setSel('lyPos', data[0]);
+  setSel('lyTop', data[1]);
+  setSel('lyBottom', data[2]);
+  $('lyColor').value = rgb565ToHex((data[3] << 8) | data[4]);
+  $('lyInfo').textContent = 'Read from watch: clock ' + ($('lyPos').selectedOptions[0].textContent.toLowerCase()) +
+    ', ' + $('lyColor').value + ', ' + data.length + ' bytes.';
+  drawClockOverlay();
+}
+
+function drawClockOverlay() {
+  const ov = $('faceOverlay');
+  if (!ov) return;
+  const x = ov.getContext('2d');
+  x.clearRect(0, 0, ov.width, ov.height);
+  if (!$('faceShowClock').checked) return;
+  const W = ov.width, H = ov.height, color = $('lyColor').value;
+  const bottom = $('lyPos').value === '1';
+  const label = v => ({ 1: 'FRI 13/11', 2: 'SLEEP 7h20', 3: '♥ 72', 4: '6,240 STEPS' })[v] || '';
+  const above = label($('lyTop').value), below = label($('lyBottom').value);
+  // Matches the photo: clock right-aligned, about rows 50-90 when at the top
+  const clockBase = bottom ? H - 52 : 88;
+  x.fillStyle = color;
+  x.textAlign = 'right';
+  x.textBaseline = 'alphabetic';
+  x.shadowColor = 'rgba(0,0,0,0.35)';
+  x.shadowBlur = 2;
+  x.font = '700 46px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
+  x.fillText('10:08', W - 14, clockBase);
+  x.font = '700 14px -apple-system, "Helvetica Neue", Arial, sans-serif';
+  if (above) x.fillText(above, W - 16, clockBase - 44);
+  if (below) x.fillText(below, W - 16, clockBase + 18);
+}
+
+async function readLayout() {
+  if (!cmdChr) { $('lyInfo').textContent = 'Connect first.'; return; }
+  $('lyInfo').textContent = 'Reading…';
+  await send(0x39);
+}
+
+async function applyLayout() {
+  if (!cmdChr) { $('lyInfo').textContent = 'Connect first.'; return; }
+  if (!lastLayoutData) {
+    $('lyInfo').textContent = 'Reading the current layout first…';
+    await send(0x39);
+    await sleep(900);
+    if (!lastLayoutData) { $('lyInfo').textContent = 'The watch didn\'t report its layout, so nothing was changed.'; return; }
+  }
+  const want = [parseInt($('lyPos').value, 10), parseInt($('lyTop').value, 10), parseInt($('lyBottom').value, 10)];
+  const c = hexToRgb565($('lyColor').value);
+  // Echo the watch's own bytes back with our fields changed, so the background id and sizes stay intact
+  let payload = lastLayoutData.slice();
+  payload[0] = want[0]; payload[1] = want[1]; payload[2] = want[2];
+  payload[3] = (c >> 8) & 255; payload[4] = c & 255;
+  if ($('lyShort').checked) payload = payload.slice(0, 37);
+  $('lyInfo').textContent = 'Sending…';
+  await send(0x38, payload);
+  await sleep(700);
+  const before = lastLayoutData;
+  lastLayoutData = null;
+  await send(0x39);
+  await sleep(900);
+  if (!lastLayoutData) { lastLayoutData = before; $('lyInfo').textContent = 'Sent, but the watch didn\'t answer the check. Look at the watch.'; return; }
+  const ok = lastLayoutData[0] === want[0] && lastLayoutData[1] === want[1] && lastLayoutData[2] === want[2] &&
+    lastLayoutData[3] === ((c >> 8) & 255) && lastLayoutData[4] === (c & 255);
+  $('lyInfo').textContent = ok ? '✓ The watch accepted the new layout.' :
+    'The watch kept its old layout' + ($('lyShort').checked ? '.' : ' — try ticking "Short format" and apply again.');
+  log('Layout ' + (ok ? 'applied' : 'not accepted') + ': ' + toHex(payload.slice(0, 5)), ok ? 'ok' : 'warn');
+}
+
 // ---- Diagnostics ----
 async function runDiagnostics() {
   const lines = [];
@@ -1268,6 +1419,11 @@ async function sendRaw() {
 $('connectBtn').onclick = () => connect(false);
 $('pickAllBtn').onclick = () => connect(true);
 $('scanBtn').onclick = scan;
+$('lyReadBtn').onclick = readLayout;
+$('lyApplyBtn').onclick = applyLayout;
+['lyPos', 'lyTop', 'lyBottom', 'lyColor', 'faceShowClock'].forEach(id => $(id).addEventListener('input', drawClockOverlay));
+['lyPos', 'lyTop', 'lyBottom'].forEach(id => $(id).addEventListener('change', drawClockOverlay));
+document.querySelectorAll('[data-swatch]').forEach(b => b.onclick = () => { $('lyColor').value = b.dataset.swatch; drawClockOverlay(); });
 $('ringStopBtn').onclick = () => stopRing(true);
 $('evCopyBtn').onclick = copyEvents;
 $('evClearBtn').onclick = () => { watchEvents = []; renderEvents(); $('evEmpty').textContent = 'No events yet.'; };

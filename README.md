@@ -49,6 +49,10 @@ The watch reports its face size in the reply to `39`; on the Drift it is **240×
 
 There is no acknowledgement or checksum per packet, so a single dropped packet shifts every pixel after it. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
 
+## Clock layout (photo face)
+
+`39` reads and `38` sets: position (`0` top, `1` bottom), content above and below (`0` none, `1` date, `2` sleep, `3` heart rate, `4` steps), clock color (RGB565, big-endian), a 32-byte background id, then on V2 the size block. The page echoes the watch's own bytes back with only those fields changed.
+
 ## Watch → phone events
 
 | Cmd | Meaning |
@@ -91,6 +95,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.9.0 | Clock layout editor for the photo face (`38`/`39`): position, color, content above/below, live preview overlay |
 | 0.8.0 | Watch events panel (music buttons, camera shutter, find phone rings the page, weather requests, unknown packets); live weather push via Open-Meteo; step goal set back to big-endian (query reply is little-endian) |
 | 0.7.1 | 500 ms pause every 4 KB during face upload (watch drops a packet while flushing to flash) |
 | 0.7.0 | Face upload fixed: 128-byte chunks at 80 ms (watch drops packets if faster) and a 3 s wait after the start command (watch drops the first packets while erasing flash) |
