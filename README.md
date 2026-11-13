@@ -95,6 +95,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.10.1 | Correct message when the watch counts every packet but never confirms the file (data lost while saving); wait up to 8 s for confirmation |
 | 0.10.0 | Ack-driven face upload: waits for the watch's ready signal, paces on its per-packet acknowledgements, verifies the final checksum |
 | 0.9.2 | Upload trace recorder (every watch reply during a face upload with bytes sent and time) and Copy log |
 | 0.9.1 | Upload speed presets with time estimates and remembered settings; default 4 KB pause 40 ms (133 s confirmed at 128 B / 80 ms) |

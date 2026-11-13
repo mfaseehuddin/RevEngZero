@@ -383,7 +383,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.10.1';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -955,7 +955,10 @@ async function uploadFace() {
     }
     // Wait for the completion + checksum reply
     const tc = Date.now();
-    while (faceDoneCrc == null && Date.now() - tc < 3000) await sleep(50);
+    while (faceDoneCrc == null && Date.now() - tc < (acked ? 8000 : 3000)) {
+      info.textContent = 'Waiting for the watch to confirm the file… ' + ((Date.now() - tc) / 1000).toFixed(1) + ' s';
+      await sleep(50);
+    }
     if (faceDoneCrc != null) {
       const cands = { 'CRC FEEA': crcFeea(bin), 'CRC-CCITT': crcCcitt(bin, 0xFFFF), 'CRC XModem': crcCcitt(bin, 0) };
       const hit = Object.entries(cands).find(([, v]) => v === faceDoneCrc);
@@ -965,8 +968,9 @@ async function uploadFace() {
       log('Transfer complete, watch checksum ' + faceDoneCrc.toString(16).toUpperCase().padStart(4, '0') + (hit ? ' = ' + hit[0] : ''), hit ? 'ok' : '');
     } else if (acked) {
       const got = Math.max(0, faceAckCount);
-      throw new Error('The watch only confirmed ' + got + ' of ' + total + ' packets, so ' + (total - got) +
-        ' were lost and the image is damaged. Lower "Packets in flight" and upload again.');
+      throw new Error(got >= total
+        ? 'The watch counted all ' + total + ' packets but never confirmed the file was complete, so some data was lost while it was saving (' + windowN + ' packets in flight is too many for it). Your old face is kept. Try ' + (windowN > 2 ? '"Fast" (2)' : '"Safe" (1)') + '.'
+        : 'The watch only confirmed ' + got + ' of ' + total + ' packets, so ' + (total - got) + ' were lost. Your old face is kept. Lower "Packets in flight" and try again.');
     }
     await sleep(200);
     await writeBytes(buildPacket(0x6E, [0, 0, 0, 0]));
@@ -981,7 +985,7 @@ async function uploadFace() {
     log('Custom face uploaded (' + size + ' bytes, ' + total + ' packets of ' + chunk + ', ' +
       (acked ? 'ack mode, window ' + windowN : 'timed ' + useDelay + ' ms') + ')', 'ok');
   } catch (e) {
-    info.textContent = '✕ ' + errText(e) + (faceAbort ? '' : (ackMode ? ' Try a window of 1.' : ' Try a smaller chunk size or a longer delay.'));
+    info.textContent = '✕ ' + errText(e) + (faceAbort || ackMode ? '' : ' Try a smaller chunk size or a longer delay.');
     log('Face upload failed: ' + errText(e), 'warn');
     if (cmdChr) { try { await writeBytes(buildPacket(0x6E, [0xFF, 0xFF, 0xFF, 0xFF])); } catch (_) {} }
   } finally {
