@@ -60,6 +60,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.7.0 | Face upload fixed: 128-byte chunks at 80 ms (watch drops packets if faster) and a 3 s wait after the start command (watch drops the first packets while erasing flash) |
 | 0.6.3 | Types 0C–1F labelled Other |
 | 0.6.2 | Message icon types 02–0B labelled |
 | 0.6.1 | Step goal is little-endian (was sent backwards) |

@@ -178,15 +178,19 @@ label.check input{width:auto;min-height:0}
           <label for="faceChunk">Chunk size</label>
           <select id="faceChunk">
             <option value="20">20 bytes (safest)</option>
-            <option value="128">128 bytes</option>
-            <option value="180" selected>180 bytes</option>
+            <option value="128" selected>128 bytes ✓</option>
+            <option value="180">180 bytes</option>
             <option value="244">244 bytes</option>
             <option value="512">512 bytes</option>
           </select>
         </div>
         <div>
           <label for="faceDelay">Delay per chunk (ms)</label>
-          <input id="faceDelay" type="number" inputmode="numeric" value="30" min="0" max="500">
+          <input id="faceDelay" type="number" inputmode="numeric" value="80" min="0" max="500">
+        </div>
+        <div>
+          <label for="faceStartWait">Wait after start (ms)</label>
+          <input id="faceStartWait" type="number" inputmode="numeric" value="3000" min="0" max="15000">
         </div>
       </div>
     </details>
@@ -269,7 +273,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.6.3';
+const APP_VERSION = '0.7.0';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -292,6 +296,7 @@ const NAMES = {0x6E:'background transfer',0x74:'face transfer',0x84:'face suppor
   0x29:'watch face',0x2B:'language',0x2E:'version',0x31:'time',0x41:'message',0x59:'steps',0x61:'find',0x69:'blood pressure',0x6B:'SpO2'};
 
 let dumpCollector = null;
+let faceStartAck = null;
 let device = null, cmdChr = null, fileChr = null, faceRejected = false, faceAbort = false, faceBusy = false, hrChr = null, hrOn = false, writeNoResp = true, rxBuf = [];
 const $ = id => document.getElementById(id);
 const toHex = b => Array.from(b, x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
@@ -364,6 +369,7 @@ function handlePacket(p) {
     }
   }
   if ((cmd === 0x6E || cmd === 0x74) && data.length && data.every(b => b === 0xFF)) faceRejected = true;
+  else if (cmd === 0x6E && faceStartAck === false) faceStartAck = toHex(data) || '(empty)';
   const name = NAMES[cmd] ? ' (' + NAMES[cmd] + ')' : '';
   let extra = '';
   if (cmd === 0x29 && data.length) extra = ' → face ' + data[0];
@@ -686,7 +692,7 @@ function downloadFace() {
 function setFaceBusy(on) {
   faceBusy = on;
   $('faceUploadBtn').textContent = on ? 'Stop' : 'Upload to watch';
-  ['faceDesign', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay'].forEach(id => $(id).disabled = on);
+  ['faceDesign', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay', 'faceStartWait'].forEach(id => $(id).disabled = on);
 }
 
 async function uploadFace() {
@@ -712,8 +718,19 @@ async function uploadFace() {
   const t0 = Date.now();
   try {
     info.textContent = 'Starting transfer (' + size.toLocaleString() + ' bytes)…';
+    faceStartAck = false;
     await writeBytes(buildPacket(0x6E, [(size >>> 24) & 255, (size >>> 16) & 255, (size >>> 8) & 255, size & 255]));
-    await sleep(500);
+    // The watch erases flash after the start command and drops anything sent too early,
+    // which shifts the whole picture sideways. Wait for its reply or the configured time.
+    const startWait = Math.max(0, parseInt($('faceStartWait').value, 10) || 0);
+    const tw = Date.now();
+    while (Date.now() - tw < startWait) {
+      if (faceRejected || faceAbort) break;
+      info.textContent = 'Watch is preparing… ' + Math.ceil((startWait - (Date.now() - tw)) / 1000) + ' s';
+      await sleep(100);
+    }
+    log('Start reply: ' + (faceStartAck || 'none') + ' after ' + (Date.now() - tw) + ' ms');
+    faceStartAck = null;
     if (faceRejected) throw new Error('The watch refused the transfer.');
 
     let noResp = typeof fileChr.writeValueWithoutResponse === 'function';
@@ -735,7 +752,8 @@ async function uploadFace() {
       if ((off / chunk) % 10 === 0 || done === size) {
         bar.value = Math.round(done * 100 / size);
         const secs = (Date.now() - t0) / 1000;
-        info.textContent = 'Sending… ' + bar.value + '% · ' + Math.round(done / 1024) + ' / ' + Math.round(size / 1024) + ' KB · ' + secs.toFixed(0) + ' s';
+        const eta = done ? Math.max(0, secs * (size - done) / done) : 0;
+        info.textContent = 'Sending… ' + bar.value + '% · ' + Math.round(done / 1024) + ' / ' + Math.round(size / 1024) + ' KB · ' + secs.toFixed(0) + ' s, about ' + eta.toFixed(0) + ' s left';
       }
     }
     await sleep(400);
