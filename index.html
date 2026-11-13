@@ -166,7 +166,20 @@ label.check input{width:auto;min-height:0}
 </main>
 
 <script>
-const SVC = 0xfeea, CMD = 0xfee2, RX = [0xfee1, 0xfee3];
+const U = n => '0000' + n.toString(16).padStart(4, '0') + '-0000-1000-8000-00805f9b34fb';
+const SVC = U(0xfeea), CMD = U(0xfee2), RX = [U(0xfee1), U(0xfee3)];
+const BATT_SVC = U(0x180f), BATT_LVL = U(0x2a19), HR_SVC = U(0x180d), HR_MEAS = U(0x2a37);
+
+// Describe any rejection value, even ones that aren't Error objects
+function errText(e) {
+  if (e === undefined) return 'no details (undefined)';
+  if (e === null) return 'no details (null)';
+  if (typeof e === 'string') return e;
+  const name = e.name && e.name !== 'Error' ? e.name + ': ' : '';
+  if (e.message) return name + e.message;
+  try { const j = JSON.stringify(e); if (j && j !== '{}') return name + j; } catch (_) {}
+  return name + String(e);
+}
 const RISKY = [0x51, 0x63, 0x6e, 0x74];
 const NAMES = {0x16:'step goal',0x17:'time format',0x19:'watch face set',0x1A:'units',0x25:'features',0x26:'step goal',
   0x29:'watch face',0x2B:'language',0x2E:'version',0x31:'time',0x41:'message',0x59:'steps',0x61:'find',0x69:'blood pressure',0x6B:'SpO2'};
@@ -222,7 +235,7 @@ async function writeBytes(bytes) {
 
 async function send(cmd, payload = []) {
   try { await writeBytes(buildPacket(cmd, payload)); }
-  catch (e) { log('✕ ' + e.message, 'warn'); }
+  catch (e) { log('✕ ' + errText(e), 'warn'); }
 }
 
 function printable(bytes) {
@@ -265,7 +278,7 @@ function connectMsg(msg, cls) {
   log(msg, cls);
 }
 
-const OPTIONAL = [SVC, 0x180f, 0x180d];
+const OPTIONAL = [SVC, BATT_SVC, HR_SVC];
 
 async function connect(pickAll) {
   if (!navigator.bluetooth) {
@@ -275,25 +288,17 @@ async function connect(pickAll) {
   const prefix = $('name').value.trim() || 'DRIFT';
   connectMsg(pickAll ? 'Opening device list (all devices)…' : 'Opening device list (looking for "' + prefix + '")…');
   try {
-    if (pickAll) {
-      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: OPTIONAL });
-    } else {
-      try {
-        device = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: prefix }, { services: [SVC] }],
-          optionalServices: OPTIONAL
-        });
-      } catch (e) {
-        if (e.name === 'NotFoundError') throw e;
-        connectMsg('Filtered picker failed (' + e.name + ': ' + e.message + '). Trying a simpler filter…', 'warn');
-        device = await navigator.bluetooth.requestDevice({ filters: [{ name: prefix }], optionalServices: OPTIONAL });
-      }
-    }
+    // Must call requestDevice straight from the tap; no retries, they'd lose the user gesture
+    device = await navigator.bluetooth.requestDevice(pickAll
+      ? { acceptAllDevices: true, optionalServices: OPTIONAL }
+      : { filters: [{ namePrefix: prefix }], optionalServices: OPTIONAL });
+    connectMsg('Picked ' + (device.name || device.id || 'a device') + '.');
     await connectTo(device);
   } catch (e) {
-    if (e.name === 'NotFoundError') connectMsg('No device chosen (' + e.message + '). If the list was empty, disconnect nRF Connect and try again.', 'warn');
-    else if (e.name === 'SecurityError') connectMsg('Blocked: ' + e.message + ' — the page must be opened over https.', 'warn');
-    else connectMsg('✕ ' + e.name + ': ' + e.message, 'warn');
+    const t = errText(e);
+    if (e && e.name === 'NotFoundError') connectMsg('No device chosen (' + t + '). If the list was empty, disconnect nRF Connect and try again.', 'warn');
+    else if (e && e.name === 'SecurityError') connectMsg('Blocked: ' + t, 'warn');
+    else connectMsg('✕ Picker failed: ' + t + (pickAll ? '' : ' — try "Pick from all devices".'), 'warn');
     setConnected(false);
   }
 }
@@ -307,23 +312,24 @@ async function connectTo(dev) {
     connectMsg('Connected to ' + (device.name || 'device') + ', finding the FEEA service…');
     let svc;
     try { svc = await server.getPrimaryService(SVC); }
-    catch (e) { throw new Error('This device has no FEEA command service — is it the watch? (' + e.message + ')'); }
+    catch (e) { throw new Error('No FEEA command service on this device — is it the watch? (' + errText(e) + ')'); }
+    connectMsg('Found FEEA, getting characteristics…');
     cmdChr = await svc.getCharacteristic(CMD);
     for (const u of RX) {
       try {
         const c = await svc.getCharacteristic(u);
         await c.startNotifications();
         c.addEventListener('characteristicvaluechanged', onRx);
-      } catch (e) { log('Could not subscribe to ' + u.toString(16).toUpperCase() + ': ' + e.message, 'warn'); }
+      } catch (e) { log('Could not subscribe to ' + u.slice(4, 8).toUpperCase() + ': ' + errText(e), 'warn'); }
     }
     try {
-      const bc = await (await server.getPrimaryService(0x180f)).getCharacteristic(0x2a19);
+      const bc = await (await server.getPrimaryService(BATT_SVC)).getCharacteristic(BATT_LVL);
       setBattery((await bc.readValue()).getUint8(0));
       await bc.startNotifications();
       bc.addEventListener('characteristicvaluechanged', e => setBattery(e.target.value.getUint8(0)));
     } catch (e) { /* battery optional */ }
     try {
-      hrChr = await (await server.getPrimaryService(0x180d)).getCharacteristic(0x2a37);
+      hrChr = await (await server.getPrimaryService(HR_SVC)).getCharacteristic(HR_MEAS);
       hrChr.addEventListener('characteristicvaluechanged', e => {
         const v = e.target.value, flags = v.getUint8(0);
         $('hr').textContent = (flags & 1 ? v.getUint16(1, true) : v.getUint8(1)) + ' bpm';
@@ -332,7 +338,7 @@ async function connectTo(dev) {
     setConnected(true);
     connectMsg('Connected to ' + (device.name || 'device') + ' — ready.', 'ok');
   } catch (e) {
-    connectMsg('✕ ' + (e.name && e.name !== 'Error' ? e.name + ': ' : '') + e.message, 'warn');
+    connectMsg('✕ Connection failed: ' + errText(e), 'warn');
     try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch (_) {}
     setConnected(false);
   }
@@ -406,7 +412,7 @@ async function scan() {
     setTimeout(stopScan, 10000);
   } catch (e) {
     navigator.bluetooth.removeEventListener('advertisementreceived', onAdvert);
-    $('scanNote').textContent = 'Scan failed: ' + e.name + ': ' + e.message + '. Use "Pick from all devices" instead.';
+    $('scanNote').textContent = 'Scan failed: ' + errText(e) + '. Use "Pick from all devices" instead.';
   }
 }
 
@@ -438,7 +444,7 @@ async function toggleHr() {
   try {
     if (hrOn) { await hrChr.stopNotifications(); hrOn = false; $('hrBtn').textContent = 'Live heart rate'; $('hr').textContent = '–'; }
     else { await hrChr.startNotifications(); hrOn = true; $('hrBtn').textContent = 'Stop heart rate'; }
-  } catch (e) { log('✕ ' + e.message, 'warn'); }
+  } catch (e) { log('✕ ' + errText(e), 'warn'); }
 }
 
 function updateMsgInfo() {
@@ -476,7 +482,7 @@ async function sendRaw() {
     log('Blocked risky command ' + cmd.toString(16).toUpperCase() + '. Tick "Allow risky" if you really mean it.', 'warn');
     return;
   }
-  try { await writeBytes(packet); } catch (e) { log('✕ ' + e.message, 'warn'); }
+  try { await writeBytes(packet); } catch (e) { log('✕ ' + errText(e), 'warn'); }
 }
 
 $('connectBtn').onclick = () => connect(false);
@@ -498,8 +504,8 @@ document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(pars
 setConnected(false);
 updateMsgInfo();
 runDiagnostics();
-window.addEventListener('error', e => connectMsg('Page error: ' + e.message, 'warn'));
-window.addEventListener('unhandledrejection', e => connectMsg('Error: ' + (e.reason && e.reason.message || e.reason), 'warn'));
+window.addEventListener('error', e => connectMsg('Page error: ' + (e.message || errText(e.error)), 'warn'));
+window.addEventListener('unhandledrejection', e => connectMsg('Error: ' + errText(e.reason), 'warn'));
 if (!navigator.bluetooth) connectMsg('No Web Bluetooth here. Open this page in Bluefy (iPhone) or Chrome (Android/desktop).', 'warn');
 </script>
 </body>
