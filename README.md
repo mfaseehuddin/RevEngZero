@@ -44,7 +44,7 @@ The watch reports its face size in the reply to `39`; on the Drift it is **240×
 2. **Wait ~3 s**: the watch erases flash and silently drops anything sent sooner
 3. Image data to `FEE6` (write without response): background 240×280 then preview 140×163, RGB565 big-endian, row by row
    - **128-byte chunks, 80 ms apart**: faster and the watch drops packets
-   - **500 ms pause every 4 KB**: the watch drops a packet while flushing each block to flash
+   - **A short pause every 4 KB** (40 ms confirmed working): the watch can drop a packet while flushing each block to flash
 4. `FE EA 20 09 6E 00 00 00 00` (finish), `FE EA 20 05 29`, `FE EA 20 06 19 01` (show photo face)
 
 There is no acknowledgement or checksum per packet, so a single dropped packet shifts every pixel after it. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
@@ -95,6 +95,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.9.1 | Upload speed presets with time estimates and remembered settings; default 4 KB pause 40 ms (133 s confirmed at 128 B / 80 ms) |
 | 0.9.0 | Clock layout editor for the photo face (`38`/`39`): position, color, content above/below, live preview overlay |
 | 0.8.0 | Watch events panel (music buttons, camera shutter, find phone rings the page, weather requests, unknown packets); live weather push via Open-Meteo; step goal set back to big-endian (query reply is little-endian) |
 | 0.7.1 | 500 ms pause every 4 KB during face upload (watch drops a packet while flushing to flash) |

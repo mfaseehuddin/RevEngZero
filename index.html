@@ -198,10 +198,18 @@ label.check input{width:auto;min-height:0}
         </div>
         <div>
           <label for="facePause">Pause every 4 KB (ms)</label>
-          <input id="facePause" type="number" inputmode="numeric" value="500" min="0" max="5000">
+          <input id="facePause" type="number" inputmode="numeric" value="40" min="0" max="5000">
         </div>
       </div>
     </details>
+    <label style="margin-top:12px">Speed preset</label>
+    <div class="grid4">
+      <button data-preset="128,80,3000,40">Safe</button>
+      <button data-preset="180,80,3000,40">Fast</button>
+      <button data-preset="180,60,3000,40">Faster</button>
+      <button data-preset="244,70,3000,40">Turbo</button>
+    </div>
+    <p id="faceEta" class="hint"></p>
     <div class="row" style="margin-top:12px">
       <button id="faceUploadBtn" class="primary" data-conn>Upload to watch</button>
       <button id="faceDownloadBtn">Download .bin</button>
@@ -363,7 +371,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.9.1';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -584,6 +592,7 @@ function setFaceSize(w, h, pw, ph, fromWatch) {
   c.style.height = Math.round(180 * h / w) + 'px';
   const ov = $('faceOverlay');
   ov.width = w; ov.height = h; ov.style.height = c.style.height;
+  if (typeof updateFaceEta === 'function' && $('faceEta')) updateFaceEta();
   $('faceSizeHint').textContent = w + ' × ' + h + (fromWatch ? ' (from the watch)' : ' (default)') + ' · preview ' + pw + ' × ' + ph + ' · the watch draws the time on top';
   drawFace();
 }
@@ -792,6 +801,7 @@ function setFaceBusy(on) {
   faceBusy = on;
   $('faceUploadBtn').textContent = on ? 'Stop' : 'Upload to watch';
   ['faceDesign', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay', 'faceStartWait', 'facePause'].forEach(id => $(id).disabled = on);
+  document.querySelectorAll('[data-preset]').forEach(b => b.disabled = on);
 }
 
 async function uploadFace() {
@@ -1274,6 +1284,20 @@ async function applyLayout() {
   log('Layout ' + (ok ? 'applied' : 'not accepted') + ': ' + toHex(payload.slice(0, 5)), ok ? 'ok' : 'warn');
 }
 
+// ---- Upload time estimate (calibrated: 128 B / 80 ms / 40 ms pause took 133 s) ----
+function updateFaceEta() {
+  const size = FACE_W * FACE_H * 2 + PREV_W * PREV_H * 2;
+  const chunk = parseInt($('faceChunk').value, 10) || 128;
+  const delay = Math.max(0, parseInt($('faceDelay').value, 10) || 0);
+  const pause = Math.max(0, parseInt($('facePause').value, 10) || 0);
+  const wait = Math.max(0, parseInt($('faceStartWait').value, 10) || 0);
+  const secs = (Math.ceil(size / chunk) * (delay + 11) + Math.floor(size / 4096) * pause + wait + 2000) / 1000;
+  const preset = [...document.querySelectorAll('[data-preset]')].find(b => b.dataset.preset === [chunk, delay, wait, pause].join(','));
+  document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('primary', b === preset));
+  $('faceEta').textContent = 'About ' + Math.round(secs) + ' s per upload (' + Math.ceil(size / chunk) + ' packets).' +
+    (chunk > 182 ? ' Above 182 bytes may exceed the iPhone\'s packet limit — check the result.' : '');
+}
+
 // ---- Diagnostics ----
 async function runDiagnostics() {
   const lines = [];
@@ -1419,6 +1443,17 @@ async function sendRaw() {
 $('connectBtn').onclick = () => connect(false);
 $('pickAllBtn').onclick = () => connect(true);
 $('scanBtn').onclick = scan;
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+  const [c, d, w, p] = b.dataset.preset.split(',');
+  $('faceChunk').value = c; $('faceDelay').value = d; $('faceStartWait').value = w; $('facePause').value = p;
+  savePref('faceSpeed', b.dataset.preset);
+  updateFaceEta();
+});
+['faceChunk', 'faceDelay', 'facePause', 'faceStartWait'].forEach(id => $(id).addEventListener('input', () => {
+  savePref('faceSpeed', [$('faceChunk').value, $('faceDelay').value, $('faceStartWait').value, $('facePause').value].join(','));
+  updateFaceEta();
+}));
+$('faceChunk').addEventListener('change', () => $('faceChunk').dispatchEvent(new Event('input')));
 $('lyReadBtn').onclick = readLayout;
 $('lyApplyBtn').onclick = applyLayout;
 ['lyPos', 'lyTop', 'lyBottom', 'lyColor', 'faceShowClock'].forEach(id => $(id).addEventListener('input', drawClockOverlay));
@@ -1467,7 +1502,12 @@ document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(pars
   if (l) $('wxLabel').value = l;
   if (c) { $('wxCity').value = c; weatherByCity(); }
 })();
+(() => {
+  const sp = loadPref('faceSpeed');
+  if (sp) { const [c, d, w, p] = sp.split(','); if ([...$('faceChunk').options].some(o => o.value === c)) $('faceChunk').value = c; $('faceDelay').value = d; $('faceStartWait').value = w; $('facePause').value = p; }
+})();
 drawFace();
+updateFaceEta();
 $('appVersion').textContent = 'v' + APP_VERSION + ' · ' + APP_BUILD;
 setConnected(false);
 updateMsgInfo();
