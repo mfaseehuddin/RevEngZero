@@ -82,13 +82,38 @@ label.check input{width:auto;min-height:0}
     <h2>Message</h2>
     <label for="msgType">Type</label>
     <select id="msgType" data-conn>
-      <option value="1">01 · Message (works)</option>
+      <option value="1">01 · Message / SMS ✓</option>
+      <option value="8">08 · WhatsApp ✓</option>
       <option value="0">00 · Incoming call (caller name)</option>
-      <option value="2">02</option><option value="3">03</option><option value="4">04</option>
-      <option value="5">05</option><option value="6">06</option><option value="7">07</option>
-      <option value="8">08</option><option value="9">09</option><option value="10">0A</option>
-      <option value="11">0B</option><option value="12">0C</option><option value="13">0D</option>
-      <option value="14">0E</option><option value="15">0F</option>
+      <option value="2">02</option>
+      <option value="3">03</option>
+      <option value="4">04</option>
+      <option value="5">05</option>
+      <option value="6">06</option>
+      <option value="7">07</option>
+      <option value="9">09</option>
+      <option value="10">0A</option>
+      <option value="11">0B</option>
+      <option value="12">0C</option>
+      <option value="13">0D</option>
+      <option value="14">0E</option>
+      <option value="15">0F</option>
+      <option value="16">10</option>
+      <option value="17">11</option>
+      <option value="18">12</option>
+      <option value="19">13</option>
+      <option value="20">14</option>
+      <option value="21">15</option>
+      <option value="22">16</option>
+      <option value="23">17</option>
+      <option value="24">18</option>
+      <option value="25">19</option>
+      <option value="26">1A</option>
+      <option value="27">1B</option>
+      <option value="28">1C</option>
+      <option value="29">1D</option>
+      <option value="30">1E</option>
+      <option value="31">1F</option>
     </select>
     <label for="msgText">Text</label>
     <textarea id="msgText" placeholder="Hi from the web" data-conn></textarea>
@@ -96,6 +121,9 @@ label.check input{width:auto;min-height:0}
       <button id="sendMsgBtn" class="primary" data-conn>Send</button>
       <button id="endCallBtn" data-conn>End call</button>
       <button id="buzzBtn" data-conn>Buzz</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="typeTestBtn" data-conn>Test next icon type</button>
     </div>
     <p class="hint" id="msgInfo">0 bytes</p>
   </section>
@@ -108,6 +136,66 @@ label.check input{width:auto;min-height:0}
       <button data-face="3" data-conn>3</button>
       <button data-face="4" data-conn>4</button>
     </div>
+  </section>
+
+  <section>
+    <h2>Custom face</h2>
+    <canvas id="faceCanvas" width="240" height="296" style="display:block;margin:0 auto 4px;width:180px;height:222px;border-radius:30px;border:6px solid #2a2d35;background:#000"></canvas>
+    <p class="hint" style="text-align:center;margin-top:4px">240 × 296 · the watch draws the time on top</p>
+    <label for="faceDesign">Design</label>
+    <select id="faceDesign">
+      <option value="horizon">Mirage · Horizon</option>
+      <option value="bold">Mirage · Bold</option>
+      <option value="image">Your own image</option>
+    </select>
+    <div id="faceImageRow" style="display:none">
+      <label for="faceImage">Image</label>
+      <input type="file" id="faceImage" accept="image/*">
+    </div>
+    <div class="grid" style="margin-top:2px">
+      <div>
+        <label for="faceAccent">Accent</label>
+        <select id="faceAccent">
+          <option value="#ffffff">White</option>
+          <option value="#8b7bff">Violet</option>
+          <option value="#ff7a45">Sunset</option>
+          <option value="#3ddc97">Mint</option>
+        </select>
+      </div>
+      <div>
+        <label for="faceBrandPos">Wordmark</label>
+        <select id="faceBrandPos">
+          <option value="bottom">Bottom</option>
+          <option value="top">Top</option>
+        </select>
+      </div>
+    </div>
+    <details style="margin-top:10px">
+      <summary class="hint" style="margin:0">Transfer settings</summary>
+      <div class="grid">
+        <div>
+          <label for="faceChunk">Chunk size</label>
+          <select id="faceChunk">
+            <option value="20">20 bytes (safest)</option>
+            <option value="128">128 bytes</option>
+            <option value="180" selected>180 bytes</option>
+            <option value="244">244 bytes</option>
+            <option value="512">512 bytes</option>
+          </select>
+        </div>
+        <div>
+          <label for="faceDelay">Delay per chunk (ms)</label>
+          <input id="faceDelay" type="number" inputmode="numeric" value="20" min="0" max="500">
+        </div>
+      </div>
+    </details>
+    <div class="row" style="margin-top:12px">
+      <button id="faceUploadBtn" class="primary" data-conn>Upload to watch</button>
+      <button id="faceDownloadBtn">Download .bin</button>
+    </div>
+    <progress id="faceProgress" max="100" value="0" style="width:100%;margin-top:10px;height:8px"></progress>
+    <p class="hint" id="faceInfo"></p>
+    <p class="hint">Uploads to the watch's photo-background face and switches to it. If the picture comes out garbled or nothing changes, try a smaller chunk size or a longer delay, or just pick another face — a failed upload doesn't harm the watch.</p>
   </section>
 
   <section>
@@ -151,6 +239,19 @@ label.check input{width:auto;min-height:0}
   </section>
 
   <section>
+    <h2>Dump for Claude</h2>
+    <p class="hint" style="margin-top:0">Reads every readable characteristic and sends only safe "query" commands, then builds a report you can copy and paste back into the chat. Takes about 30 seconds.</p>
+    <div class="row"><button id="dumpBtn" class="primary" data-conn>Dump everything</button></div>
+    <p id="dumpInfo" class="hint"></p>
+    <textarea id="dumpOut" readonly style="display:none;min-height:160px;font-family:var(--mono);font-size:11px;margin-top:10px"></textarea>
+    <div id="dumpActions" class="row" style="display:none;margin-top:10px">
+      <button id="dumpCopyBtn">Copy</button>
+      <button id="dumpShareBtn">Share</button>
+      <button id="dumpSaveBtn">Save .json</button>
+    </div>
+  </section>
+
+  <section>
     <h2>Raw packet</h2>
     <textarea id="raw" placeholder="61   (or a full packet like FE EA 20 05 61)" data-conn></textarea>
     <label class="check"><input type="checkbox" id="autoHeader" checked> Add FE EA header and size for me (enter command + payload)</label>
@@ -167,7 +268,8 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
+const KNOWN_MSG_TYPES = {0x01: 'Message/SMS', 0x08: 'WhatsApp'};
 const APP_BUILD = '2026-11-13';
 
 const U = n => '0000' + n.toString(16).padStart(4, '0') + '-0000-1000-8000-00805f9b34fb';
@@ -185,10 +287,11 @@ function errText(e) {
   return name + String(e);
 }
 const RISKY = [0x51, 0x63, 0x6e, 0x74];
-const NAMES = {0x16:'step goal',0x17:'time format',0x19:'watch face set',0x1A:'units',0x25:'features',0x26:'step goal',
+const NAMES = {0x6E:'background transfer',0x74:'face transfer',0x84:'face support',0x16:'step goal',0x17:'time format',0x19:'watch face set',0x1A:'units',0x25:'features',0x26:'step goal',
   0x29:'watch face',0x2B:'language',0x2E:'version',0x31:'time',0x41:'message',0x59:'steps',0x61:'find',0x69:'blood pressure',0x6B:'SpO2'};
 
-let device = null, cmdChr = null, hrChr = null, hrOn = false, writeNoResp = true, rxBuf = [];
+let dumpCollector = null;
+let device = null, cmdChr = null, fileChr = null, faceRejected = false, faceAbort = false, faceBusy = false, hrChr = null, hrOn = false, writeNoResp = true, rxBuf = [];
 const $ = id => document.getElementById(id);
 const toHex = b => Array.from(b, x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -251,6 +354,8 @@ function printable(bytes) {
 
 function handlePacket(p) {
   const cmd = p[4], data = p.slice(5);
+  if (dumpCollector) dumpCollector.push(toHex(p));
+  if ((cmd === 0x6E || cmd === 0x74) && data.length && data.every(b => b === 0xFF)) faceRejected = true;
   const name = NAMES[cmd] ? ' (' + NAMES[cmd] + ')' : '';
   let extra = '';
   if (cmd === 0x29 && data.length) extra = ' → face ' + data[0];
@@ -268,6 +373,7 @@ function onRx(e) {
     const need = ((rxBuf[2] - 0x20) << 8) | rxBuf[3];
     if (rxBuf.length >= need) { handlePacket(rxBuf.slice(0, need)); rxBuf = []; }
   } else {
+    if (dumpCollector) dumpCollector.push('raw ' + toHex(v));
     log('← ' + toHex(v));
     rxBuf = [];
   }
@@ -282,7 +388,8 @@ function connectMsg(msg, cls) {
   log(msg, cls);
 }
 
-const OPTIONAL = [SVC, BATT_SVC, HR_SVC];
+const CUSTOM = id => '0000' + id + '-3c17-d293-8e48-14fe2e4da212';
+const OPTIONAL = [SVC, BATT_SVC, HR_SVC, U(0x180a), U(0xfee7), CUSTOM('01ff'), CUSTOM('d0ff'), CUSTOM('02fd')];
 
 async function connect(pickAll) {
   if (!navigator.bluetooth) {
@@ -310,7 +417,7 @@ async function connect(pickAll) {
 async function connectTo(dev) {
   device = dev;
   try {
-    device.addEventListener('gattserverdisconnected', () => { cmdChr = null; hrChr = null; setConnected(false); log('Disconnected', 'warn'); });
+    device.addEventListener('gattserverdisconnected', () => { cmdChr = null; fileChr = null; hrChr = null; faceAbort = true; setConnected(false); log('Disconnected', 'warn'); });
     connectMsg('Connecting to ' + (device.name || device.id || 'device') + '…');
     const server = await device.gatt.connect();
     connectMsg('Connected to ' + (device.name || 'device') + ', finding the FEEA service…');
@@ -319,6 +426,8 @@ async function connectTo(dev) {
     catch (e) { throw new Error('No FEEA command service on this device — is it the watch? (' + errText(e) + ')'); }
     connectMsg('Found FEEA, getting characteristics…');
     cmdChr = await svc.getCharacteristic(CMD);
+    try { fileChr = await svc.getCharacteristic(U(0xfee6)); }
+    catch (e) { fileChr = null; log('No FEE6 data channel (custom faces won\'t upload): ' + errText(e), 'warn'); }
     for (const u of RX) {
       try {
         const c = await svc.getCharacteristic(u);
@@ -346,6 +455,365 @@ async function connectTo(dev) {
     try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch (_) {}
     setConnected(false);
   }
+}
+
+
+// ================= Custom face =================
+// Format (same as DaFbc / DaFup for MoYoung v2, 240x296 screens):
+//   background 240x296 RGB565 big-endian, then preview 140x163 RGB565 big-endian.
+// Upload: FEE2 <- 6E + size(4, BE); data -> FEE6 in chunks; FEE2 <- 6E 00000000; 29; 19 01.
+const FACE_W = 240, FACE_H = 296, PREV_W = 140, PREV_H = 163;
+let faceImg = null;
+
+function rgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+
+function spacedText(x, text, cx, y, spacing) {
+  const widths = [...text].map(ch => x.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0) + spacing * (widths.length - 1);
+  let px = cx - total / 2;
+  x.textAlign = 'left';
+  [...text].forEach((ch, i) => { x.fillText(ch, px, y); px += widths[i] + spacing; });
+}
+
+function wordmark(x, acc, y) {
+  x.fillStyle = '#fff';
+  x.font = '800 28px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
+  x.textBaseline = 'alphabetic';
+  spacedText(x, 'MIRAGE', FACE_W / 2, y, 7);
+  x.fillStyle = rgba(acc, 0.7);
+  x.font = '600 8px -apple-system, "Helvetica Neue", Arial, sans-serif';
+  spacedText(x, 'VISION MADE FUNCTIONAL', FACE_W / 2, y + 17, 2.4);
+}
+
+function wave(x, cx, y, len, amp, phase, color, width) {
+  x.beginPath();
+  for (let i = 0; i <= len; i += 2) {
+    const px = cx - len / 2 + i;
+    const py = y + Math.sin(i / 8 + phase) * amp;
+    if (i === 0) x.moveTo(px, py); else x.lineTo(px, py);
+  }
+  x.strokeStyle = color;
+  x.lineWidth = width;
+  x.lineCap = 'round';
+  x.stroke();
+}
+
+function drawHorizon(x, acc, pos) {
+  const g = x.createLinearGradient(0, 0, 0, FACE_H);
+  g.addColorStop(0, '#000');
+  g.addColorStop(1, '#07070b');
+  x.fillStyle = g;
+  x.fillRect(0, 0, FACE_W, FACE_H);
+
+  const hy = pos === 'bottom' ? 196 : 214;   // horizon line
+  const cx = FACE_W / 2, r = 40;
+
+  // glow
+  const glow = x.createRadialGradient(cx, hy, 4, cx, hy, 120);
+  glow.addColorStop(0, rgba(acc, 0.22));
+  glow.addColorStop(1, rgba(acc, 0));
+  x.fillStyle = glow;
+  x.fillRect(0, 0, FACE_W, FACE_H);
+
+  // sun: half disc above the horizon, sliced like a heat shimmer
+  x.save();
+  x.beginPath();
+  x.arc(cx, hy, r, Math.PI, 0);
+  x.closePath();
+  x.clip();
+  x.fillStyle = rgba(acc, 0.95);
+  x.fillRect(cx - r, hy - r, 2 * r, r);
+  // gaps cut through the disc only (heat-shimmer slices)
+  x.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 4; i++) x.fillRect(cx - r, hy - 7 - i * 9, 2 * r, 2.2 + i * 0.9);
+  x.restore();
+
+  // horizon
+  x.fillStyle = rgba(acc, 0.85);
+  x.fillRect(16, hy, FACE_W - 32, 1.5);
+
+  // mirage reflection: wavy lines fading downward
+  const lines = pos === 'bottom' ? 4 : 6;
+  for (let i = 0; i < lines; i++) {
+    const y = hy + 9 + i * 8;
+    const len = 2 * r * (1 - i * 0.13);
+    wave(x, cx, y, len, 1.6 + i * 0.25, i * 1.3, rgba(acc, 0.55 - i * 0.08), 1.6);
+  }
+
+  wordmark(x, acc, pos === 'bottom' ? 262 : 46);
+}
+
+function drawBold(x, acc, pos) {
+  x.fillStyle = '#000';
+  x.fillRect(0, 0, FACE_W, FACE_H);
+  // giant outlined letters as texture
+  x.save();
+  x.font = '900 84px -apple-system, "Helvetica Neue", Arial Black, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'alphabetic';
+  x.lineWidth = 1.3;
+  x.strokeStyle = rgba(acc, 0.24);
+  const base = pos === 'bottom' ? [76, 152, 228] : [138, 212, 286];
+  ['MI', 'RA', 'GE'].forEach((t, i) => x.strokeText(t, FACE_W / 2, base[i]));
+  x.restore();
+  // accent bar
+  const by = pos === 'bottom' ? 236 : 66;
+  x.fillStyle = rgba(acc, 0.95);
+  x.fillRect(FACE_W / 2 - 18, by, 36, 3);
+  wordmark(x, acc, pos === 'bottom' ? 264 : 40);
+}
+
+function drawImage(x) {
+  x.fillStyle = '#000';
+  x.fillRect(0, 0, FACE_W, FACE_H);
+  if (!faceImg) {
+    x.fillStyle = '#666';
+    x.font = '500 13px -apple-system, Arial, sans-serif';
+    x.textAlign = 'center';
+    x.fillText('Pick an image below', FACE_W / 2, FACE_H / 2);
+    return;
+  }
+  const sc = Math.max(FACE_W / faceImg.width, FACE_H / faceImg.height);
+  const w = faceImg.width * sc, h = faceImg.height * sc;
+  x.drawImage(faceImg, (FACE_W - w) / 2, (FACE_H - h) / 2, w, h);
+}
+
+function drawFace() {
+  const design = $('faceDesign').value, acc = $('faceAccent').value, pos = $('faceBrandPos').value;
+  $('faceImageRow').style.display = design === 'image' ? 'block' : 'none';
+  const x = $('faceCanvas').getContext('2d');
+  x.save();
+  if (design === 'image') drawImage(x);
+  else if (design === 'bold') drawBold(x, acc, pos);
+  else drawHorizon(x, acc, pos);
+  x.restore();
+}
+
+function toRgb565BE(src, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  x.imageSmoothingEnabled = true;
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(src, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data;
+  const out = new Uint8Array(w * h * 2);
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 2) {
+    const v = ((d[i] >> 3) << 11) | ((d[i + 1] >> 2) << 5) | (d[i + 2] >> 3);
+    out[j] = v >> 8;
+    out[j + 1] = v & 255;
+  }
+  return out;
+}
+
+function buildFaceBin() {
+  const src = $('faceCanvas');
+  const bg = toRgb565BE(src, FACE_W, FACE_H);
+  const pv = toRgb565BE(src, PREV_W, PREV_H);
+  const out = new Uint8Array(bg.length + pv.length);
+  out.set(bg, 0);
+  out.set(pv, bg.length);
+  return out;
+}
+
+function downloadFace() {
+  if ($('faceDesign').value === 'image' && !faceImg) { $('faceInfo').textContent = 'Pick an image first.'; return; }
+  const bin = buildFaceBin();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bin], { type: 'application/octet-stream' }));
+  a.download = 'drift-face-' + $('faceDesign').value + '.bin';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  $('faceInfo').textContent = 'Saved ' + bin.length.toLocaleString() + ' bytes.';
+}
+
+function setFaceBusy(on) {
+  faceBusy = on;
+  $('faceUploadBtn').textContent = on ? 'Stop' : 'Upload to watch';
+  ['faceDesign', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay'].forEach(id => $(id).disabled = on);
+}
+
+async function uploadFace() {
+  if (!cmdChr) { $('faceInfo').textContent = 'Connect to the watch first.'; return; }
+  if (!fileChr) { $('faceInfo').textContent = 'This watch has no FEE6 data channel, so custom faces can\'t be uploaded.'; return; }
+  if ($('faceDesign').value === 'image' && !faceImg) { $('faceInfo').textContent = 'Pick an image first.'; return; }
+
+  const bin = buildFaceBin();
+  const size = bin.length;
+  const chunk = parseInt($('faceChunk').value, 10) || 180;
+  const delay = Math.max(0, parseInt($('faceDelay').value, 10) || 0);
+  const info = $('faceInfo'), bar = $('faceProgress');
+  faceRejected = false;
+  faceAbort = false;
+  setFaceBusy(true);
+  bar.value = 0;
+  const t0 = Date.now();
+  try {
+    info.textContent = 'Starting transfer (' + size.toLocaleString() + ' bytes)…';
+    await writeBytes(buildPacket(0x6E, [(size >>> 24) & 255, (size >>> 16) & 255, (size >>> 8) & 255, size & 255]));
+    await sleep(500);
+    if (faceRejected) throw new Error('The watch refused the transfer.');
+
+    let noResp = typeof fileChr.writeValueWithoutResponse === 'function';
+    for (let off = 0; off < size; off += chunk) {
+      if (faceAbort) throw new Error('Stopped.');
+      if (faceRejected) throw new Error('The watch reported an error mid-transfer.');
+      const part = bin.slice(off, off + chunk);
+      if (noResp) {
+        try { await fileChr.writeValueWithoutResponse(part); }
+        catch (e) {
+          if (off === 0) { noResp = false; await fileChr.writeValue(part); }
+          else throw e;
+        }
+      } else {
+        await fileChr.writeValue(part);
+      }
+      if (delay) await sleep(delay);
+      const done = Math.min(size, off + chunk);
+      if ((off / chunk) % 10 === 0 || done === size) {
+        bar.value = Math.round(done * 100 / size);
+        const secs = (Date.now() - t0) / 1000;
+        info.textContent = 'Sending… ' + bar.value + '% · ' + Math.round(done / 1024) + ' / ' + Math.round(size / 1024) + ' KB · ' + secs.toFixed(0) + ' s';
+      }
+    }
+    await sleep(400);
+    await writeBytes(buildPacket(0x6E, [0, 0, 0, 0]));
+    await sleep(300);
+    await writeBytes(buildPacket(0x29));
+    await sleep(300);
+    await writeBytes(buildPacket(0x19, [1]));
+    await sleep(600);
+    if (faceRejected) throw new Error('The watch rejected the file at the end (checksum or format).');
+    bar.value = 100;
+    info.textContent = 'Done in ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s — the watch should now show your face.';
+    log('Custom face uploaded (' + size + ' bytes, chunk ' + chunk + ', delay ' + delay + ' ms)', 'ok');
+  } catch (e) {
+    info.textContent = '✕ ' + errText(e) + (faceAbort ? '' : ' Try a smaller chunk size or a longer delay.');
+    log('Face upload failed: ' + errText(e), 'warn');
+    if (cmdChr) { try { await writeBytes(buildPacket(0x6E, [0xFF, 0xFF, 0xFF, 0xFF])); } catch (_) {} }
+  } finally {
+    setFaceBusy(false);
+  }
+}
+
+
+// ================= Dump for Claude =================
+const DUMP_QUERIES = [
+  ['2E', '', 'device version'], ['25', 'FF', 'feature support'], ['29', '', 'current watch face'],
+  ['84', '', 'watch face support'], ['39', '', 'watch face layout'], ['2B', '', 'language'],
+  ['26', '', 'step goal'], ['27', '', 'time format'], ['2A', '', 'units'], ['24', '', 'dominant hand'],
+  ['28', '', 'quick view'], ['2C', '', 'other message'], ['2D', '', 'sedentary reminder'],
+  ['2F', '', 'HR timing'], ['21', '', 'alarms'], ['81', '', 'do not disturb'], ['82', '', 'quick view time'],
+  ['83', '', 'reminder to move'], ['85', '', 'period reminder'], ['88', '', 'breathing light'],
+  ['59', '00', 'steps today'], ['59', '02', 'steps category 02'], ['34', '', 'last dynamic HR'],
+  ['37', '', 'movement HR'], ['32', '', 'sleep', 1500], ['33', '01', 'past steps/sleep 1', 1500]
+];
+
+function asciiOf(bytes) {
+  const s = [...bytes].map(b => (b >= 32 && b < 127) ? String.fromCharCode(b) : '.').join('');
+  return /[A-Za-z0-9]{3,}/.test(s) ? s : undefined;
+}
+
+function propsOf(ch) {
+  const p = ch.properties || {};
+  return ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate'].filter(k => p[k]);
+}
+
+async function runDump() {
+  if (!device || !device.gatt.connected) { $('dumpInfo').textContent = 'Connect first.'; return; }
+  const info = $('dumpInfo');
+  $('dumpBtn').disabled = true;
+  const report = {
+    app: 'v' + APP_VERSION, when: new Date().toISOString(),
+    device: { name: device.name, id: device.id }, browser: navigator.userAgent,
+    knownMessageTypes: KNOWN_MSG_TYPES, gatt: [], queries: []
+  };
+  try {
+    info.textContent = 'Listing services…';
+    let services = [];
+    try { services = await device.gatt.getPrimaryServices(); }
+    catch (e) { report.gattError = errText(e); }
+    for (const svc of services) {
+      const entry = { service: svc.uuid, characteristics: [] };
+      try {
+        for (const ch of await svc.getCharacteristics()) {
+          const c = { uuid: ch.uuid, props: propsOf(ch) };
+          if (c.props.includes('read')) {
+            try {
+              const v = await ch.readValue();
+              const b = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+              c.hex = toHex(b);
+              const a = asciiOf(b);
+              if (a) c.ascii = a;
+            } catch (e) { c.readError = errText(e); }
+          }
+          entry.characteristics.push(c);
+          info.textContent = 'Reading ' + svc.uuid.slice(4, 8).toUpperCase() + ' / ' + ch.uuid.slice(4, 8).toUpperCase() + '…';
+        }
+      } catch (e) { entry.error = errText(e); }
+      report.gatt.push(entry);
+    }
+
+    for (let i = 0; i < DUMP_QUERIES.length; i++) {
+      if (!device.gatt.connected) throw new Error('Watch disconnected during the dump');
+      const [cmdHex, argHex, name, wait] = DUMP_QUERIES[i];
+      info.textContent = 'Query ' + (i + 1) + '/' + DUMP_QUERIES.length + ': ' + name + '…';
+      const pkt = buildPacket(parseInt(cmdHex, 16), argHex ? parseHex(argHex) : []);
+      dumpCollector = [];
+      try { await writeBytes(pkt); } catch (e) { dumpCollector.push('send error: ' + errText(e)); }
+      await sleep(wait || 700);
+      report.queries.push({ cmd: cmdHex, name, sent: toHex(pkt), replies: dumpCollector });
+      dumpCollector = null;
+    }
+    const json = JSON.stringify(report, null, 1);
+    $('dumpOut').value = json;
+    $('dumpOut').style.display = 'block';
+    $('dumpActions').style.display = 'flex';
+    const answered = report.queries.filter(q => q.replies.length).length;
+    info.textContent = 'Done: ' + report.gatt.length + ' services, ' + answered + '/' + report.queries.length + ' queries answered. Tap Copy and paste it to Claude.';
+  } catch (e) {
+    info.textContent = '✕ ' + errText(e);
+  } finally {
+    dumpCollector = null;
+    $('dumpBtn').disabled = !(device && device.gatt.connected);
+  }
+}
+
+async function copyDump() {
+  const t = $('dumpOut');
+  try { await navigator.clipboard.writeText(t.value); $('dumpInfo').textContent = 'Copied — paste it into the chat.'; }
+  catch (_) {
+    t.focus(); t.select(); t.setSelectionRange(0, t.value.length);
+    const ok = document.execCommand && document.execCommand('copy');
+    $('dumpInfo').textContent = ok ? 'Copied — paste it into the chat.' : 'Select the text above and copy it manually.';
+  }
+}
+
+async function shareDump() {
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Drift dump', text: $('dumpOut').value }); } catch (_) {}
+  } else { copyDump(); }
+}
+
+function saveDump() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([$('dumpOut').value], { type: 'application/json' }));
+  a.download = 'drift-dump-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json';
+  document.body.append(a); a.click(); a.remove();
+}
+
+function testNextType() {
+  const sel = $('msgType');
+  const cur = parseInt(sel.value, 10);
+  const next = (cur + 1) % 32;
+  sel.value = String(next);
+  const label = 'Type ' + next.toString(16).toUpperCase().padStart(2, '0');
+  send(0x41, [next, ...new TextEncoder().encode(label)]);
+  log('Sent icon test ' + label + ' — note which icon appears', 'ok');
 }
 
 // ---- Diagnostics ----
@@ -493,6 +961,22 @@ async function sendRaw() {
 $('connectBtn').onclick = () => connect(false);
 $('pickAllBtn').onclick = () => connect(true);
 $('scanBtn').onclick = scan;
+$('dumpBtn').onclick = runDump;
+$('dumpCopyBtn').onclick = copyDump;
+$('dumpShareBtn').onclick = shareDump;
+$('dumpSaveBtn').onclick = saveDump;
+$('typeTestBtn').onclick = testNextType;
+$('faceUploadBtn').onclick = () => faceBusy ? (faceAbort = true) : uploadFace();
+$('faceDownloadBtn').onclick = downloadFace;
+['faceDesign', 'faceAccent', 'faceBrandPos'].forEach(id => $(id).addEventListener('change', drawFace));
+$('faceImage').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => { faceImg = img; drawFace(); };
+  img.onerror = () => { $('faceInfo').textContent = 'Could not read that image.'; };
+  img.src = URL.createObjectURL(f);
+});
 $('disconnectBtn').onclick = () => device && device.gatt.connected && device.gatt.disconnect();
 $('sendMsgBtn').onclick = sendMessage;
 $('endCallBtn').onclick = () => send(0x41, [0xFF]);
@@ -506,6 +990,7 @@ $('msgText').addEventListener('input', updateMsgInfo);
 document.querySelectorAll('[data-face]').forEach(b => b.onclick = () => send(0x19, [parseInt(b.dataset.face, 10)]));
 document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(parseInt(b.dataset.cmd, 16), b.dataset.arg ? parseHex(b.dataset.arg) : []));
 
+drawFace();
 $('appVersion').textContent = 'v' + APP_VERSION + ' · ' + APP_BUILD;
 setConnected(false);
 updateMsgInfo();

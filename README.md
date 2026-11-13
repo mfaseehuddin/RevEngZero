@@ -28,6 +28,7 @@ Size counts every byte. Confirmed working:
 |---|---|
 | `FE EA 20 05 61` | Vibrate (find device) |
 | `FE EA 20 08 41 01 48 69` | Message "Hi" (type 01) |
+| `FE EA 20 08 41 08 48 69` | Message "Hi" with WhatsApp icon (type 08) |
 
 Avoid `51` (shutdown), `63` (firmware upgrade), `6E` / `74` (file transfer).
 
@@ -39,5 +40,6 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.5.0 | Custom face designer and uploader (Mirage Horizon / Bold / your own image, 240×296 RGB565 via FEE6); Dump-for-Claude report; message icon tester (08 = WhatsApp) |
 | 0.4.0 | Version label; Bluefy connect fix (full UUIDs, single picker call, readable errors); diagnostics and nearby-device scan |
 | 0.1.0 | First web app, ESP32 sketch, protocol notes |
