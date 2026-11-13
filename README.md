@@ -52,6 +52,7 @@ References: [Gadgetbridge Moyoung protocol](https://gadgetbridge.org/internals/s
 | `09` | LINE |
 | `0A` | KakaoTalk |
 | `0B` | Gmail |
+| `0C`–`1F` | Other (generic icon) |
 
 ## Versioning
 
@@ -59,6 +60,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.6.3 | Types 0C–1F labelled Other |
 | 0.6.2 | Message icon types 02–0B labelled |
 | 0.6.1 | Step goal is little-endian (was sent backwards) |
 | 0.6.0 | Face size read from the watch (cmd 39 → 240×280, preview 140×163) instead of the spec-sheet 240×296; test pattern; 30 ms default chunk delay |

@@ -94,26 +94,26 @@ label.check input{width:auto;min-height:0}
       <option value="9">09 · LINE</option>
       <option value="10">0A · KakaoTalk</option>
       <option value="11">0B · Gmail</option>
-      <option value="12">0C</option>
-      <option value="13">0D</option>
-      <option value="14">0E</option>
-      <option value="15">0F</option>
-      <option value="16">10</option>
-      <option value="17">11</option>
-      <option value="18">12</option>
-      <option value="19">13</option>
-      <option value="20">14</option>
-      <option value="21">15</option>
-      <option value="22">16</option>
-      <option value="23">17</option>
-      <option value="24">18</option>
-      <option value="25">19</option>
-      <option value="26">1A</option>
-      <option value="27">1B</option>
-      <option value="28">1C</option>
-      <option value="29">1D</option>
-      <option value="30">1E</option>
-      <option value="31">1F</option>
+      <option value="12">0C · Other</option>
+      <option value="13">0D · Other</option>
+      <option value="14">0E · Other</option>
+      <option value="15">0F · Other</option>
+      <option value="16">10 · Other</option>
+      <option value="17">11 · Other</option>
+      <option value="18">12 · Other</option>
+      <option value="19">13 · Other</option>
+      <option value="20">14 · Other</option>
+      <option value="21">15 · Other</option>
+      <option value="22">16 · Other</option>
+      <option value="23">17 · Other</option>
+      <option value="24">18 · Other</option>
+      <option value="25">19 · Other</option>
+      <option value="26">1A · Other</option>
+      <option value="27">1B · Other</option>
+      <option value="28">1C · Other</option>
+      <option value="29">1D · Other</option>
+      <option value="30">1E · Other</option>
+      <option value="31">1F · Other</option>
     </select>
     <label for="msgText">Text</label>
     <textarea id="msgText" placeholder="Hi from the web" data-conn></textarea>
@@ -269,8 +269,8 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.6.2';
-const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail'};
+const APP_VERSION = '0.6.3';
+const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
 const U = n => '0000' + n.toString(16).padStart(4, '0') + '-0000-1000-8000-00805f9b34fb';
