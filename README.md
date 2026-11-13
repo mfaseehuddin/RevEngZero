@@ -36,12 +36,30 @@ Avoid `51` (shutdown), `63` (firmware upgrade), `6E` / `74` (file transfer).
 
 References: [Gadgetbridge Moyoung protocol](https://gadgetbridge.org/internals/specifics/moyoung-protocol/), [uwatch2 notes](https://gist.github.com/kabbi/854a541c1a32e15fb0dfa3338f4ee4a9).
 
+## Message icon types (command 41)
+
+| Type | Icon |
+|---|---|
+| `00` | Incoming call |
+| `01` | Message / SMS |
+| `02` | WeChat |
+| `03` | QQ |
+| `04` | Facebook |
+| `05` | Twitter / X |
+| `06` | Instagram |
+| `07` | Skype |
+| `08` | WhatsApp |
+| `09` | LINE |
+| `0A` | KakaoTalk |
+| `0B` | Gmail |
+
 ## Versioning
 
 The page shows its version under the title (`APP_VERSION` in `index.html`). Bump it on every commit so you can see when GitHub Pages has deployed the new build.
 
 | Version | Change |
 |---|---|
+| 0.6.2 | Message icon types 02–0B labelled |
 | 0.6.1 | Step goal is little-endian (was sent backwards) |
 | 0.6.0 | Face size read from the watch (cmd 39 → 240×280, preview 140×163) instead of the spec-sheet 240×296; test pattern; 30 ms default chunk delay |
 | 0.5.0 | Custom face designer and uploader (Mirage Horizon / Bold / your own image, 240×296 RGB565 via FEE6); Dump-for-Claude report; message icon tester (08 = WhatsApp) |

@@ -82,18 +82,18 @@ label.check input{width:auto;min-height:0}
     <h2>Message</h2>
     <label for="msgType">Type</label>
     <select id="msgType" data-conn>
-      <option value="1">01 · Message / SMS ✓</option>
-      <option value="8">08 · WhatsApp ✓</option>
+      <option value="1">01 · Message / SMS</option>
+      <option value="8">08 · WhatsApp</option>
       <option value="0">00 · Incoming call (caller name)</option>
-      <option value="2">02</option>
-      <option value="3">03</option>
-      <option value="4">04</option>
-      <option value="5">05</option>
-      <option value="6">06</option>
-      <option value="7">07</option>
-      <option value="9">09</option>
-      <option value="10">0A</option>
-      <option value="11">0B</option>
+      <option value="2">02 · WeChat</option>
+      <option value="3">03 · QQ</option>
+      <option value="4">04 · Facebook</option>
+      <option value="5">05 · Twitter / X</option>
+      <option value="6">06 · Instagram</option>
+      <option value="7">07 · Skype</option>
+      <option value="9">09 · LINE</option>
+      <option value="10">0A · KakaoTalk</option>
+      <option value="11">0B · Gmail</option>
       <option value="12">0C</option>
       <option value="13">0D</option>
       <option value="14">0E</option>
@@ -269,8 +269,8 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.6.1';
-const KNOWN_MSG_TYPES = {0x01: 'Message/SMS', 0x08: 'WhatsApp'};
+const APP_VERSION = '0.6.2';
+const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail'};
 const APP_BUILD = '2026-11-13';
 
 const U = n => '0000' + n.toString(16).padStart(4, '0') + '-0000-1000-8000-00805f9b34fb';
