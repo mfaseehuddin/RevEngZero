@@ -57,7 +57,25 @@ label.check input{width:auto;min-height:0}
       <button id="connectBtn" class="primary">Connect</button>
       <button id="disconnectBtn" disabled>Disconnect</button>
     </div>
-    <p class="hint">Close the Zero app first — the watch accepts one connection at a time. On iPhone, open this page in Bluefy.</p>
+    <div class="row" style="margin-top:8px">
+      <button id="pickAllBtn">Pick from all devices</button>
+    </div>
+    <p id="connectMsg" class="hint"></p>
+    <p class="hint">Disconnect nRF Connect and close the Zero app first — while anything is connected, the watch stops advertising and won't show up.</p>
+  </section>
+
+  <section>
+    <h2>Diagnostics</h2>
+    <div id="diag" class="hint" style="margin:0;font-family:var(--mono)"></div>
+  </section>
+
+  <section>
+    <h2>Nearby devices</h2>
+    <div class="row">
+      <button id="scanBtn">Scan for 10 seconds</button>
+    </div>
+    <div id="scanList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+    <p id="scanNote" class="hint"></p>
   </section>
 
   <section>
@@ -240,21 +258,56 @@ function onRx(e) {
 
 function setBattery(v) { $('battery').textContent = v + '%'; }
 
-async function connect() {
+function connectMsg(msg, cls) {
+  const el = $('connectMsg');
+  el.textContent = msg;
+  el.className = 'hint' + (cls ? ' ' + cls : '');
+  log(msg, cls);
+}
+
+const OPTIONAL = [SVC, 0x180f, 0x180d];
+
+async function connect(pickAll) {
   if (!navigator.bluetooth) {
-    log('No Web Bluetooth in this browser. On iPhone use Bluefy; on Android or desktop use Chrome.', 'warn');
+    connectMsg('No Web Bluetooth in this browser. On iPhone use Bluefy; on Android or desktop use Chrome.', 'warn');
     return;
   }
+  const prefix = $('name').value.trim() || 'DRIFT';
+  connectMsg(pickAll ? 'Opening device list (all devices)…' : 'Opening device list (looking for "' + prefix + '")…');
   try {
-    const prefix = $('name').value.trim() || 'DRIFT';
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: prefix }, { services: [SVC] }],
-      optionalServices: [SVC, 0x180f, 0x180d]
-    });
+    if (pickAll) {
+      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: OPTIONAL });
+    } else {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: prefix }, { services: [SVC] }],
+          optionalServices: OPTIONAL
+        });
+      } catch (e) {
+        if (e.name === 'NotFoundError') throw e;
+        connectMsg('Filtered picker failed (' + e.name + ': ' + e.message + '). Trying a simpler filter…', 'warn');
+        device = await navigator.bluetooth.requestDevice({ filters: [{ name: prefix }], optionalServices: OPTIONAL });
+      }
+    }
+    await connectTo(device);
+  } catch (e) {
+    if (e.name === 'NotFoundError') connectMsg('No device chosen (' + e.message + '). If the list was empty, disconnect nRF Connect and try again.', 'warn');
+    else if (e.name === 'SecurityError') connectMsg('Blocked: ' + e.message + ' — the page must be opened over https.', 'warn');
+    else connectMsg('✕ ' + e.name + ': ' + e.message, 'warn');
+    setConnected(false);
+  }
+}
+
+async function connectTo(dev) {
+  device = dev;
+  try {
     device.addEventListener('gattserverdisconnected', () => { cmdChr = null; hrChr = null; setConnected(false); log('Disconnected', 'warn'); });
-    log('Connecting to ' + (device.name || 'device') + '…');
+    connectMsg('Connecting to ' + (device.name || device.id || 'device') + '…');
     const server = await device.gatt.connect();
-    const svc = await server.getPrimaryService(SVC);
+    connectMsg('Connected to ' + (device.name || 'device') + ', finding the FEEA service…');
+    let svc;
+    try { svc = await server.getPrimaryService(SVC); }
+    catch (e) { throw new Error('This device has no FEEA command service — is it the watch? (' + e.message + ')'); }
     cmdChr = await svc.getCharacteristic(CMD);
     for (const u of RX) {
       try {
@@ -277,11 +330,107 @@ async function connect() {
       });
     } catch (e) { hrChr = null; }
     setConnected(true);
-    log('Connected', 'ok');
+    connectMsg('Connected to ' + (device.name || 'device') + ' — ready.', 'ok');
   } catch (e) {
-    log('✕ ' + e.message, 'warn');
+    connectMsg('✕ ' + (e.name && e.name !== 'Error' ? e.name + ': ' : '') + e.message, 'warn');
+    try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch (_) {}
     setConnected(false);
   }
+}
+
+// ---- Diagnostics ----
+async function runDiagnostics() {
+  const lines = [];
+  lines.push('Web Bluetooth: ' + (navigator.bluetooth ? 'yes' : 'NO — use Bluefy (iOS) or Chrome'));
+  lines.push('Secure page (https): ' + (window.isSecureContext ? 'yes' : 'NO'));
+  lines.push('In a frame: ' + (window.top !== window.self ? 'yes (may block Bluetooth)' : 'no'));
+  if (navigator.bluetooth) {
+    lines.push('requestDevice: ' + (typeof navigator.bluetooth.requestDevice === 'function' ? 'yes' : 'no'));
+    lines.push('Live scan (requestLEScan): ' + (typeof navigator.bluetooth.requestLEScan === 'function' ? 'yes' : 'no'));
+    lines.push('writeWithoutResponse: ' + (window.BluetoothRemoteGATTCharacteristic && 'writeValueWithoutResponse' in BluetoothRemoteGATTCharacteristic.prototype ? 'yes' : 'unknown'));
+    if (typeof navigator.bluetooth.getAvailability === 'function') {
+      try { lines.push('Bluetooth radio: ' + ((await navigator.bluetooth.getAvailability()) ? 'available' : 'OFF or unavailable')); }
+      catch (e) { lines.push('Bluetooth radio: unknown (' + e.message + ')'); }
+    }
+  }
+  lines.push('Browser: ' + navigator.userAgent);
+  $('diag').textContent = lines.join('\n');
+  $('diag').style.whiteSpace = 'pre-wrap';
+}
+
+// ---- Nearby devices ----
+const seen = new Map();
+let scanHandle = null;
+
+function renderScan() {
+  const list = $('scanList');
+  list.textContent = '';
+  const items = [...seen.values()].sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999));
+  for (const d of items) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)';
+    const left = document.createElement('div');
+    left.style.minWidth = '0';
+    const nm = document.createElement('b');
+    nm.textContent = d.name || '(no name)';
+    const sub = document.createElement('div');
+    sub.className = 'hint';
+    sub.style.margin = '2px 0 0';
+    sub.style.wordBreak = 'break-all';
+    sub.textContent = (d.extra || '') + (d.id ? ' · ' + d.id : '');
+    left.append(nm, sub);
+    const right = document.createElement('div');
+    right.className = 'hint';
+    right.style.margin = '0';
+    right.style.whiteSpace = 'nowrap';
+    right.textContent = d.rssi != null ? d.rssi + ' dBm' : '';
+    row.append(left, right);
+    if (/drift/i.test(d.name || '') || d.isWatch) row.style.borderColor = 'var(--ok)';
+    list.append(row);
+  }
+  $('scanNote').textContent = items.length ? items.length + ' device(s) seen.' : '';
+}
+
+async function scan() {
+  if (!navigator.bluetooth) { $('scanNote').textContent = 'No Web Bluetooth in this browser.'; return; }
+  if (typeof navigator.bluetooth.requestLEScan !== 'function') {
+    $('scanNote').textContent = 'This browser can\'t list devices inside the page. Tap "Pick from all devices" instead — Bluefy\'s own list shows everything it can see, so check whether DRIFT appears there.';
+    return;
+  }
+  seen.clear(); renderScan();
+  try {
+    navigator.bluetooth.addEventListener('advertisementreceived', onAdvert);
+    scanHandle = await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
+    $('scanBtn').disabled = true;
+    $('scanNote').textContent = 'Scanning…';
+    setTimeout(stopScan, 10000);
+  } catch (e) {
+    navigator.bluetooth.removeEventListener('advertisementreceived', onAdvert);
+    $('scanNote').textContent = 'Scan failed: ' + e.name + ': ' + e.message + '. Use "Pick from all devices" instead.';
+  }
+}
+
+function onAdvert(ev) {
+  const id = ev.device && ev.device.id;
+  const prev = seen.get(id) || {};
+  const svcData = ev.serviceData ? [...ev.serviceData.keys()].map(k => String(k).replace(/^0000|-0000-1000-8000-00805f9b34fb$/g, '').toUpperCase()) : [];
+  const isWatch = svcData.some(k => k.startsWith('FEEA'));
+  seen.set(id, {
+    id,
+    name: ev.name || (ev.device && ev.device.name) || prev.name,
+    rssi: ev.rssi ?? prev.rssi,
+    isWatch: isWatch || prev.isWatch,
+    extra: svcData.length ? 'service data: ' + svcData.join(', ') : prev.extra
+  });
+  renderScan();
+}
+
+function stopScan() {
+  try { if (scanHandle && scanHandle.active) scanHandle.stop(); } catch (_) {}
+  navigator.bluetooth && navigator.bluetooth.removeEventListener('advertisementreceived', onAdvert);
+  $('scanBtn').disabled = false;
+  if (!seen.size) $('scanNote').textContent = 'Nothing seen. Is Bluetooth on, and is the watch disconnected from nRF Connect?';
+  else renderScan();
 }
 
 async function toggleHr() {
@@ -330,7 +479,9 @@ async function sendRaw() {
   try { await writeBytes(packet); } catch (e) { log('✕ ' + e.message, 'warn'); }
 }
 
-$('connectBtn').onclick = connect;
+$('connectBtn').onclick = () => connect(false);
+$('pickAllBtn').onclick = () => connect(true);
+$('scanBtn').onclick = scan;
 $('disconnectBtn').onclick = () => device && device.gatt.connected && device.gatt.disconnect();
 $('sendMsgBtn').onclick = sendMessage;
 $('endCallBtn').onclick = () => send(0x41, [0xFF]);
@@ -346,7 +497,10 @@ document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(pars
 
 setConnected(false);
 updateMsgInfo();
-if (!navigator.bluetooth) log('No Web Bluetooth here. Open this page in Bluefy (iPhone) or Chrome (Android/desktop).', 'warn');
+runDiagnostics();
+window.addEventListener('error', e => connectMsg('Page error: ' + e.message, 'warn'));
+window.addEventListener('unhandledrejection', e => connectMsg('Error: ' + (e.reason && e.reason.message || e.reason), 'warn'));
+if (!navigator.bluetooth) connectMsg('No Web Bluetooth here. Open this page in Bluefy (iPhone) or Chrome (Android/desktop).', 'warn');
 </script>
 </body>
 </html>
