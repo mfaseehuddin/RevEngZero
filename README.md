@@ -95,6 +95,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.9.2 | Upload trace recorder (every watch reply during a face upload with bytes sent and time) and Copy log |
 | 0.9.1 | Upload speed presets with time estimates and remembered settings; default 4 KB pause 40 ms (133 s confirmed at 128 B / 80 ms) |
 | 0.9.0 | Clock layout editor for the photo face (`38`/`39`): position, color, content above/below, live preview overlay |
 | 0.8.0 | Watch events panel (music buttons, camera shutter, find phone rings the page, weather requests, unknown packets); live weather push via Open-Meteo; step goal set back to big-endian (query reply is little-endian) |
