@@ -269,7 +269,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.1';
 const KNOWN_MSG_TYPES = {0x01: 'Message/SMS', 0x08: 'WhatsApp'};
 const APP_BUILD = '2026-11-13';
 
@@ -367,7 +367,7 @@ function handlePacket(p) {
   const name = NAMES[cmd] ? ' (' + NAMES[cmd] + ')' : '';
   let extra = '';
   if (cmd === 0x29 && data.length) extra = ' → face ' + data[0];
-  else if ((cmd === 0x16 || cmd === 0x26) && data.length >= 4) extra = ' → ' + ((data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]) >>> 0) + ' steps';
+  else if ((cmd === 0x16 || cmd === 0x26) && data.length >= 4) extra = ' → ' + ((data[3] << 24 | data[2] << 16 | data[1] << 8 | data[0]) >>> 0) + ' steps';
   else { const t = printable(data); if (t) extra = ' → "' + t + '"'; }
   log('← ' + toHex(p) + '  cmd ' + cmd.toString(16).toUpperCase().padStart(2, '0') + name + extra, 'ok');
 }
@@ -1000,7 +1000,7 @@ function syncTime() {
 
 function setGoal() {
   const g = Math.max(1, Math.min(100000, parseInt($('goal').value, 10) || 0));
-  send(0x16, [(g >>> 24) & 255, (g >>> 16) & 255, (g >>> 8) & 255, g & 255]);
+  send(0x16, [g & 255, (g >>> 8) & 255, (g >>> 16) & 255, (g >>> 24) & 255]); // little-endian (watch replies 58 1B 00 00 = 7000)
 }
 
 async function sendRaw() {

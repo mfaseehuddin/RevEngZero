@@ -42,6 +42,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.6.1 | Step goal is little-endian (was sent backwards) |
 | 0.6.0 | Face size read from the watch (cmd 39 → 240×280, preview 140×163) instead of the spec-sheet 240×296; test pattern; 30 ms default chunk delay |
 | 0.5.0 | Custom face designer and uploader (Mirage Horizon / Bold / your own image, 240×296 RGB565 via FEE6); Dump-for-Claude report; message icon tester (08 = WhatsApp) |
 | 0.4.0 | Version label; Bluefy connect fix (full UUIDs, single picker call, readable errors); diagnostics and nearby-device scan |
