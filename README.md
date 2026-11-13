@@ -36,6 +36,19 @@ Avoid `51` (shutdown), `63` (firmware upgrade), `6E` / `74` (file transfer).
 
 References: [Gadgetbridge Moyoung protocol](https://gadgetbridge.org/internals/specifics/moyoung-protocol/), [uwatch2 notes](https://gist.github.com/kabbi/854a541c1a32e15fb0dfa3338f4ee4a9).
 
+## Custom face upload (confirmed working)
+
+The watch reports its face size in the reply to `39`; on the Drift it is **240×280**, preview **140×163** (not the 240×296 on spec sheets).
+
+1. `FE EA 20 09 6E` + total size (4 bytes, big-endian) to `FEE2`
+2. **Wait ~3 s**: the watch erases flash and silently drops anything sent sooner
+3. Image data to `FEE6` (write without response): background 240×280 then preview 140×163, RGB565 big-endian, row by row
+   - **128-byte chunks, 80 ms apart**: faster and the watch drops packets
+   - **500 ms pause every 4 KB**: the watch drops a packet while flushing each block to flash
+4. `FE EA 20 09 6E 00 00 00 00` (finish), `FE EA 20 05 29`, `FE EA 20 06 19 01` (show photo face)
+
+There is no acknowledgement or checksum per packet, so a single dropped packet shifts every pixel after it. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
+
 ## Message icon types (command 41)
 
 | Type | Icon |
