@@ -192,6 +192,10 @@ label.check input{width:auto;min-height:0}
           <label for="faceStartWait">Wait after start (ms)</label>
           <input id="faceStartWait" type="number" inputmode="numeric" value="3000" min="0" max="15000">
         </div>
+        <div>
+          <label for="facePause">Pause every 4 KB (ms)</label>
+          <input id="facePause" type="number" inputmode="numeric" value="500" min="0" max="5000">
+        </div>
       </div>
     </details>
     <div class="row" style="margin-top:12px">
@@ -273,7 +277,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.7.1';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -692,7 +696,7 @@ function downloadFace() {
 function setFaceBusy(on) {
   faceBusy = on;
   $('faceUploadBtn').textContent = on ? 'Stop' : 'Upload to watch';
-  ['faceDesign', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay', 'faceStartWait'].forEach(id => $(id).disabled = on);
+  ['faceDesign', 'faceAccent', 'faceBrandPos', 'faceImage', 'faceChunk', 'faceDelay', 'faceStartWait', 'facePause'].forEach(id => $(id).disabled = on);
 }
 
 async function uploadFace() {
@@ -710,6 +714,7 @@ async function uploadFace() {
   const size = bin.length;
   const chunk = parseInt($('faceChunk').value, 10) || 180;
   const delay = Math.max(0, parseInt($('faceDelay').value, 10) || 0);
+  const pauseMs = Math.max(0, parseInt($('facePause').value, 10) || 0);
   const info = $('faceInfo'), bar = $('faceProgress');
   faceRejected = false;
   faceAbort = false;
@@ -749,6 +754,8 @@ async function uploadFace() {
       }
       if (delay) await sleep(delay);
       const done = Math.min(size, off + chunk);
+      // Let the watch flush its buffer to flash; it drops packets while busy writing
+      if (pauseMs && Math.floor(done / 4096) !== Math.floor(off / 4096)) await sleep(pauseMs);
       if ((off / chunk) % 10 === 0 || done === size) {
         bar.value = Math.round(done * 100 / size);
         const secs = (Date.now() - t0) / 1000;
@@ -766,7 +773,7 @@ async function uploadFace() {
     if (faceRejected) throw new Error('The watch rejected the file at the end (checksum or format).');
     bar.value = 100;
     info.textContent = 'Done in ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s — the watch should now show your face.';
-    log('Custom face uploaded (' + size + ' bytes, chunk ' + chunk + ', delay ' + delay + ' ms)', 'ok');
+    log('Custom face uploaded (' + size + ' bytes, chunk ' + chunk + ', delay ' + delay + ' ms, pause ' + pauseMs + ' ms / 4 KB)', 'ok');
   } catch (e) {
     info.textContent = '✕ ' + errText(e) + (faceAbort ? '' : ' Try a smaller chunk size or a longer delay.');
     log('Face upload failed: ' + errText(e), 'warn');
