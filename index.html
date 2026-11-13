@@ -314,6 +314,7 @@ label.check input{width:auto;min-height:0}
       <button data-swatch="#ff7a45" style="background:#ff7a45;color:#000">Sunset</button>
       <button data-swatch="#8b7bff" style="background:#8b7bff;color:#000">Violet</button>
     </div>
+    <label class="check"><input type="checkbox" id="lyUseMd5" checked> Tag the layout with the last uploaded picture (keeps your background)</label>
     <label class="check"><input type="checkbox" id="lyShort"> Short format (37 bytes, older watches)</label>
     <div class="row" style="margin-top:10px">
       <button id="lyReadBtn" data-conn>Read from watch</button>
@@ -426,7 +427,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.13.0';
+const APP_VERSION = '0.13.1';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -1121,6 +1122,8 @@ async function uploadFace(opts = {}) {
     if (faceRejected) throw new Error('The watch rejected the file at the end (checksum or format).');
     bar.value = 100;
     ok = true;
+    lastLayoutData = null;   // the background changed, so any cached layout (with the old picture's md5) is stale
+    savePref('faceMd5', md5Hex(bin));
     info.textContent = 'Done in ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s' + (opts.retry ? ' (retried at Safe speed)' : '') + '.' + check;
     log('Custom face uploaded (' + size + ' bytes, ' + total + ' packets of ' + chunk + ', ' +
       (acked ? 'ack mode, window ' + windowN + (rateKBs ? ', ' + rateKBs + ' KB/s cap' : '') : 'timed ' + useDelay + ' ms') + ')', 'ok');
@@ -1487,6 +1490,35 @@ async function sendWeather(w) {
 // Reply data: [position, above, below, colorHi, colorLo (RGB565), md5 x32, then on V2: sizes + FF]
 // position 0 = top, 1 = bottom; content 0 none, 1 date, 2 sleep, 3 heart rate, 4 steps
 let lastLayoutData = null;
+let layoutQuiet = false;   // true while Apply re-reads the layout, so the reply doesn't overwrite your choices
+
+// Small MD5 (the layout carries the background picture's md5 as 32 hex digits, each sent as a 0-15 value)
+function md5Hex(bytes) {
+  const K = [], S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  for (let i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0;
+  const n = bytes.length, len = ((n + 8 >> 6) + 1) * 64, m = new Uint8Array(len);
+  m.set(bytes); m[n] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(len - 8, (n * 8) >>> 0, true); dv.setUint32(len - 4, Math.floor(n / 2 ** 29), true);
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  for (let o = 0; o < len; o += 64) {
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16) { F = (B & C) | (~B & D); g = i; }
+      else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; }
+      else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; }
+      else { F = C ^ (B | ~D); g = (7 * i) % 16; }
+      F = (F + A + K[i] + dv.getUint32(o + g * 4, true)) >>> 0;
+      A = D; D = C; C = B;
+      const r = S[(i >> 4) * 4 + (i & 3)];
+      B = (B + ((F << r) | (F >>> (32 - r)))) >>> 0;
+    }
+    a0 = (a0 + A) >>> 0; b0 = (b0 + B) >>> 0; c0 = (c0 + C) >>> 0; d0 = (d0 + D) >>> 0;
+  }
+  return [a0, b0, c0, d0].map(v => [0, 8, 16, 24].map(sh => ((v >>> sh) & 255).toString(16).padStart(2, '0')).join('')).join('');
+}
+const md5Field = data => data.slice(5, 37).map(v => v.toString(16)).join('');
 
 const rgb565ToHex = v => '#' + [((v >> 11) & 31) * 255 / 31, ((v >> 5) & 63) * 255 / 63, (v & 31) * 255 / 31]
   .map(c => Math.round(c).toString(16).padStart(2, '0')).join('');
@@ -1508,6 +1540,7 @@ function setSel(id, v) {
 function onLayoutReply(data) {
   if (data.length < 5) return;
   lastLayoutData = data.slice();
+  if (layoutQuiet) return;
   setSel('lyPos', data[0]);
   setSel('lyTop', data[1]);
   setSel('lyBottom', data[2]);
@@ -1549,26 +1582,38 @@ async function readLayout() {
 
 async function applyLayout() {
   if (!cmdChr) { $('lyInfo').textContent = 'Connect first.'; return; }
-  if (!lastLayoutData) {
-    $('lyInfo').textContent = 'Reading the current layout first…';
-    await send(0x39);
-    await sleep(900);
-    if (!lastLayoutData) { $('lyInfo').textContent = 'The watch didn\'t report its layout, so nothing was changed.'; return; }
-  }
   const want = [parseInt($('lyPos').value, 10), parseInt($('lyTop').value, 10), parseInt($('lyBottom').value, 10)];
   const c = hexToRgb565($('lyColor').value);
-  // Echo the watch's own bytes back with our fields changed, so the background id and sizes stay intact
+  // Always read fresh: a layout cached from before an upload carries the old picture's md5,
+  // and echoing that back makes the watch fall back to its default background.
+  $('lyInfo').textContent = 'Reading the current layout first…';
+  layoutQuiet = true;
+  lastLayoutData = null;
+  await send(0x39);
+  await sleep(900);
+  layoutQuiet = false;
+  if (!lastLayoutData) { $('lyInfo').textContent = 'The watch didn\'t report its layout, so nothing was changed.'; return; }
   let payload = lastLayoutData.slice();
   payload[0] = want[0]; payload[1] = want[1]; payload[2] = want[2];
   payload[3] = (c >> 8) & 255; payload[4] = c & 255;
+  const watchMd5 = md5Field(lastLayoutData), ourMd5 = loadPref('faceMd5');
+  log('Layout md5 — watch reports ' + (watchMd5 || '(none)') + ', last upload from this page ' + (ourMd5 || '(none)'), 'info');
+  if (ourMd5 && payload.length >= 37 && $('lyUseMd5').checked) {
+    for (let i = 0; i < 32; i++) payload[5 + i] = parseInt(ourMd5[i], 16);
+  }
   if ($('lyShort').checked) payload = payload.slice(0, 37);
   $('lyInfo').textContent = 'Sending…';
   await send(0x38, payload);
   await sleep(700);
+  // Make sure the photo face is still the one showing
+  const slot = parseInt($('faceSlot').value, 10);
+  if (slot) { await send(0x19, [slot]); await sleep(400); }
   const before = lastLayoutData;
   lastLayoutData = null;
+  layoutQuiet = true;
   await send(0x39);
   await sleep(900);
+  layoutQuiet = false;
   if (!lastLayoutData) { lastLayoutData = before; $('lyInfo').textContent = 'Sent, but the watch didn\'t answer the check. Look at the watch.'; return; }
   const ok = lastLayoutData[0] === want[0] && lastLayoutData[1] === want[1] && lastLayoutData[2] === want[2] &&
     lastLayoutData[3] === ((c >> 8) & 255) && lastLayoutData[4] === (c & 255);

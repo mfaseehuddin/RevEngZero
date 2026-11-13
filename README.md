@@ -109,6 +109,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 |---|---|
 | 0.12.0 | Default face upload: 244-byte packets, 1 in flight, checksum-verified, ~73 s (Best). Pair presets marked as failing |
 | 0.13.0 | New default design “Mirage · Sunset”: layout A (moon, clock top) or B (sun, clock bottom) in 8 palettes; sets the clock layout to match |
+| 0.13.1 | Applying the clock layout no longer resets the background: always re-reads the layout first and tags it with the md5 of the last upload |
 | 0.11.1 | Finding: >1 packet in flight corrupts the stored image even when rate-limited. Presets and auto-tune now test 244-byte packets and a window of 2 instead of speed limits |
 | 0.11.0 | Speed limit (KB/s) and "Find fastest safe speed" auto-tuning, verified by the watch's checksum; photo face slot setting (default 2; was switching to face 1, the stock face) |
 | 0.10.2 | Watch checksum confirmed as CRC-16 seeded 0xFEEA; a mismatch (or 0000) now cancels the upload, keeps the old face and retries at Safe speed |
