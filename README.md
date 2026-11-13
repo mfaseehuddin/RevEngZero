@@ -32,3 +32,12 @@ Size counts every byte. Confirmed working:
 Avoid `51` (shutdown), `63` (firmware upgrade), `6E` / `74` (file transfer).
 
 References: [Gadgetbridge Moyoung protocol](https://gadgetbridge.org/internals/specifics/moyoung-protocol/), [uwatch2 notes](https://gist.github.com/kabbi/854a541c1a32e15fb0dfa3338f4ee4a9).
+
+## Versioning
+
+The page shows its version under the title (`APP_VERSION` in `index.html`). Bump it on every commit so you can see when GitHub Pages has deployed the new build.
+
+| Version | Change |
+|---|---|
+| 0.4.0 | Version label; Bluefy connect fix (full UUIDs, single picker call, readable errors); diagnostics and nearby-device scan |
+| 0.1.0 | First web app, ESP32 sketch, protocol notes |

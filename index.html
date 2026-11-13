@@ -42,7 +42,7 @@ label.check input{width:auto;min-height:0}
 <body>
 <main>
   <header>
-    <h1>Drift Control</h1>
+    <div><h1>Drift Control</h1><div id="appVersion" class="hint" style="margin:2px 0 0;font-family:var(--mono)"></div></div>
     <div class="status"><span id="dot" class="dot"></span><span id="statusText">Disconnected</span></div>
   </header>
 
@@ -166,6 +166,10 @@ label.check input{width:auto;min-height:0}
 </main>
 
 <script>
+// Bump on every commit so you can tell when the new version is live
+const APP_VERSION = '0.4.0';
+const APP_BUILD = '2026-11-13';
+
 const U = n => '0000' + n.toString(16).padStart(4, '0') + '-0000-1000-8000-00805f9b34fb';
 const SVC = U(0xfeea), CMD = U(0xfee2), RX = [U(0xfee1), U(0xfee3)];
 const BATT_SVC = U(0x180f), BATT_LVL = U(0x2a19), HR_SVC = U(0x180d), HR_MEAS = U(0x2a37);
@@ -347,6 +351,7 @@ async function connectTo(dev) {
 // ---- Diagnostics ----
 async function runDiagnostics() {
   const lines = [];
+  lines.push('App version: v' + APP_VERSION + ' (' + APP_BUILD + ')');
   lines.push('Web Bluetooth: ' + (navigator.bluetooth ? 'yes' : 'NO — use Bluefy (iOS) or Chrome'));
   lines.push('Secure page (https): ' + (window.isSecureContext ? 'yes' : 'NO'));
   lines.push('In a frame: ' + (window.top !== window.self ? 'yes (may block Bluetooth)' : 'no'));
@@ -501,6 +506,7 @@ $('msgText').addEventListener('input', updateMsgInfo);
 document.querySelectorAll('[data-face]').forEach(b => b.onclick = () => send(0x19, [parseInt(b.dataset.face, 10)]));
 document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(parseInt(b.dataset.cmd, 16), b.dataset.arg ? parseHex(b.dataset.arg) : []));
 
+$('appVersion').textContent = 'v' + APP_VERSION + ' · ' + APP_BUILD;
 setConnected(false);
 updateMsgInfo();
 runDiagnostics();
