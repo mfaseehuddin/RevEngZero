@@ -230,10 +230,10 @@ label.check input{width:auto;min-height:0}
     </details>
     <label style="margin-top:12px">Speed preset</label>
     <div class="grid4">
+      <button data-preset="ack,244,1,0">Best ✓</button>
       <button data-preset="ack,180,1,0">Safe ✓</button>
-      <button data-preset="ack,244,1,0">Big</button>
-      <button data-preset="ack,180,2,0">Pair</button>
-      <button data-preset="ack,244,2,0">Big pair</button>
+      <button data-preset="ack,180,2,0">Pair ✗</button>
+      <button data-preset="ack,244,2,0">Big pair ✗</button>
     </div>
     <p id="faceEta" class="hint"></p>
     <div class="row" style="margin-top:8px"><button id="faceTuneBtn" data-conn>Find fastest safe speed</button></div>
@@ -400,7 +400,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.11.1';
+const APP_VERSION = '0.12.0';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -1486,7 +1486,7 @@ function updateFaceEta() {
   $('faceEta').textContent = (mode === 'ack'
     ? 'Paced by the watch\'s replies: roughly ' + Math.round(ackSecs) + ' s (' + Math.ceil(size / chunk) + ' packets). Every upload is checksum-verified.'
     : 'About ' + Math.round(secs) + ' s per upload (' + Math.ceil(size / chunk) + ' packets).') +
-    (chunk > 182 ? ' Above 182 bytes may exceed the iPhone\'s packet limit — check the result.' : '');
+    (chunk > 244 ? ' Above 244 bytes exceeds the Bluetooth packet limit.' : '');
 }
 
 // ---- Diagnostics ----
@@ -1716,7 +1716,7 @@ document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(pars
     if ([...$('faceChunk').options].some(o => o.value === c)) $('faceChunk').value = c;
     $('faceWindow').value = win || 1; $('faceDelay').value = d || 80; $('faceStartWait').value = w || 3000; $('facePause').value = p || 40;
     if (r != null) $('faceRate').value = r; if (sl != null) $('faceSlot').value = sl;
-  } else { $('faceMode').value = 'ack'; $('faceChunk').value = '180'; $('faceWindow').value = '1'; $('faceRate').value = '0'; }
+  } else { $('faceMode').value = 'ack'; $('faceChunk').value = '244'; $('faceWindow').value = '1'; $('faceRate').value = '0'; }
 })();
 drawFace();
 updateFaceEta();

@@ -49,6 +49,18 @@ The watch reports its face size in the reply to `39`; on the Drift it is **240×
 
 **Update:** the watch *does* acknowledge. On `FEE3` it replies `6E 00 00` when ready (about 2.3 s after start), then `6E nn nn` with the running count of packets received after every `FEE6` write, and finally `6E FF FF cc cc`: the watch reads the image back from flash and returns its CRC-16 (seeded `0xFEEA`, same as kabbi's notes), or `00 00` if verification failed. At ~9.7 KB/s (244-byte packets, 4 in flight) every packet was acknowledged but the stored copy was corrupted, so the real limit is flash write speed, not Bluetooth. Pacing on these replies replaces the fixed delays. A dropped packet shows up as the count falling behind, and the checksum confirms the stored image. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
 
+### Upload speed findings
+
+| Setting | Result | Time |
+|---|---|---|
+| 244 B, 1 in flight | ✓ verified (`33 7A`) | ~73 s |
+| 180 B, 1 in flight | ✓ verified | ~96 s |
+| 180 B or 244 B, 2+ in flight | ✗ stored copy corrupted (checksum `00 00`), even when rate-limited | n/a |
+
+- The watch acknowledges each packet about **90 ms** after it is sent regardless of size, i.e. the Bluetooth connection interval, so a bigger packet is the only speed lever.
+- 244 bytes is the largest packet the link carries; a second packet arriving before the watch has stored the first corrupts the image.
+- Preview data at the end of the file survived corruption that hit the main image, so always trust the checksum, not the preview.
+
 ## Clock layout (photo face)
 
 `39` reads and `38` sets: position (`0` top, `1` bottom), content above and below (`0` none, `1` date, `2` sleep, `3` heart rate, `4` steps), clock color (RGB565, big-endian), a 32-byte background id, then on V2 the size block. The page echoes the watch's own bytes back with only those fields changed.
@@ -95,6 +107,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.12.0 | Default face upload: 244-byte packets, 1 in flight, checksum-verified, ~73 s (Best). Pair presets marked as failing |
 | 0.11.1 | Finding: >1 packet in flight corrupts the stored image even when rate-limited. Presets and auto-tune now test 244-byte packets and a window of 2 instead of speed limits |
 | 0.11.0 | Speed limit (KB/s) and "Find fastest safe speed" auto-tuning, verified by the watch's checksum; photo face slot setting (default 2; was switching to face 1, the stock face) |
 | 0.10.2 | Watch checksum confirmed as CRC-16 seeded 0xFEEA; a mismatch (or 0000) now cancels the upload, keeps the old face and retries at Safe speed |
