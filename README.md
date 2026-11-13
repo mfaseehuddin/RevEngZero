@@ -95,6 +95,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.11.1 | Finding: >1 packet in flight corrupts the stored image even when rate-limited. Presets and auto-tune now test 244-byte packets and a window of 2 instead of speed limits |
 | 0.11.0 | Speed limit (KB/s) and "Find fastest safe speed" auto-tuning, verified by the watch's checksum; photo face slot setting (default 2; was switching to face 1, the stock face) |
 | 0.10.2 | Watch checksum confirmed as CRC-16 seeded 0xFEEA; a mismatch (or 0000) now cancels the upload, keeps the old face and retries at Safe speed |
 | 0.10.1 | Correct message when the watch counts every packet but never confirms the file (data lost while saving); wait up to 8 s for confirmation |

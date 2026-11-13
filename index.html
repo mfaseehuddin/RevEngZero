@@ -231,9 +231,9 @@ label.check input{width:auto;min-height:0}
     <label style="margin-top:12px">Speed preset</label>
     <div class="grid4">
       <button data-preset="ack,180,1,0">Safe ✓</button>
-      <button data-preset="ack,180,4,4">4 KB/s</button>
-      <button data-preset="ack,180,4,6">6 KB/s</button>
-      <button data-preset="ack,180,4,8">8 KB/s</button>
+      <button data-preset="ack,244,1,0">Big</button>
+      <button data-preset="ack,180,2,0">Pair</button>
+      <button data-preset="ack,244,2,0">Big pair</button>
     </div>
     <p id="faceEta" class="hint"></p>
     <div class="row" style="margin-top:8px"><button id="faceTuneBtn" data-conn>Find fastest safe speed</button></div>
@@ -400,7 +400,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.11.1';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -1042,24 +1042,34 @@ async function uploadFace(opts = {}) {
 // Try progressively slower speed limits; keep the first one the watch's checksum confirms
 async function tuneFaceSpeed() {
   if (!cmdChr) { $('faceInfo').textContent = 'Connect to the watch first.'; return; }
-  const rates = [8, 6, 5, 4, 3];
-  $('faceMode').value = 'ack'; $('faceChunk').value = '180'; $('faceWindow').value = '4';
-  for (const r of rates) {
-    log('Speed test: ' + r + ' KB/s', 'ok');
-    $('faceRate').value = String(r);
+  // Learned: more than one packet in flight corrupted the stored image even at low speed limits,
+  // so test packet size and a window of 2, fastest first. Safe (180 B, 1 in flight) is verified.
+  const configs = [
+    { chunk: 244, win: 2, name: 'Big pair (244 B, 2 in flight)' },
+    { chunk: 180, win: 2, name: 'Pair (180 B, 2 in flight)' },
+    { chunk: 244, win: 1, name: 'Big (244 B, 1 in flight)' }
+  ];
+  $('faceMode').value = 'ack'; $('faceRate').value = '0';
+  const results = [];
+  for (const c of configs) {
+    log('Speed test: ' + c.name, 'ok');
+    $('faceChunk').value = String(c.chunk); $('faceWindow').value = String(c.win);
     const t = Date.now();
     const ok = await uploadFace({ noRetry: true });
     if (faceAbort) return;
+    results.push(c.name + ': ' + (ok ? '✓' : '✗'));
     if (ok) {
       saveFaceSpeed(); updateFaceEta();
-      $('faceInfo').textContent = '✓ Fastest verified speed: ' + r + ' KB/s (' + ((Date.now() - t) / 1000).toFixed(0) + ' s per upload). Saved as your setting.';
+      $('faceInfo').textContent = '✓ Fastest verified: ' + c.name + ', ' + ((Date.now() - t) / 1000).toFixed(0) + ' s per upload. Saved as your setting. (' + results.join(' · ') + ')';
+      log('Speed tests: ' + results.join(' · '), 'ok');
       return;
     }
     await sleep(1500);
   }
-  $('faceRate').value = '0'; $('faceWindow').value = '1';
+  $('faceChunk').value = '180'; $('faceWindow').value = '1';
   saveFaceSpeed(); updateFaceEta();
-  $('faceInfo').textContent = 'No speed limit passed — using Safe (1 packet at a time).';
+  $('faceInfo').textContent = 'Only Safe works on this watch (' + results.join(' · ') + '). Using Safe: 180 B, 1 in flight.';
+  log('Speed tests: ' + results.join(' · '), 'warn');
 }
 
 
