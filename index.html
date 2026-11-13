@@ -248,6 +248,40 @@ label.check input{width:auto;min-height:0}
   </section>
 
   <section>
+    <h2>Watch events</h2>
+    <p class="hint" style="margin-top:0">Everything the watch sends on its own shows up here. Type what you're about to do, then use the app on the watch.</p>
+    <label for="evTag">I'm doing…</label>
+    <input id="evTag" placeholder="e.g. music app → next song" autocomplete="off">
+    <div class="stats" style="margin:12px 0 0">
+      <div class="stat"><b id="evMusic">–</b><span>Last music button</span></div>
+      <div class="stat"><b id="evCamera">0</b><span>Shutter presses</span></div>
+    </div>
+    <label class="check"><input type="checkbox" id="evBeep" checked> Ring this phone when the watch uses "Find phone"</label>
+    <label class="check"><input type="checkbox" id="evAutoWeather" checked> Send weather when the watch asks for it</label>
+    <div class="row" style="margin-top:10px">
+      <button id="ringStopBtn" disabled>Stop ringing</button>
+      <button id="evCopyBtn">Copy events</button>
+      <button id="evClearBtn">Clear</button>
+    </div>
+    <div id="evList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+    <p id="evEmpty" class="hint">No events yet.</p>
+  </section>
+
+  <section>
+    <h2>Weather</h2>
+    <div class="row"><button id="wxLocBtn">Use my location</button></div>
+    <label for="wxCity">Or a city</label>
+    <div class="row">
+      <input id="wxCity" placeholder="Lahore" autocomplete="off" style="flex:1 1 auto">
+      <button id="wxSearchBtn" style="flex:0 0 auto;padding:10px 16px">Find</button>
+    </div>
+    <label for="wxLabel">Name on the watch (4 characters)</label>
+    <input id="wxLabel" maxlength="4" autocomplete="off">
+    <p id="wxInfo" class="hint"></p>
+    <div class="row" style="margin-top:10px"><button id="wxSendBtn" class="primary" data-conn>Send weather to watch</button></div>
+  </section>
+
+  <section>
     <h2>Dump for Claude</h2>
     <p class="hint" style="margin-top:0">Reads every readable characteristic and sends only safe "query" commands, then builds a report you can copy and paste back into the chat. Takes about 30 seconds.</p>
     <div class="row"><button id="dumpBtn" class="primary" data-conn>Dump everything</button></div>
@@ -277,7 +311,7 @@ label.check input{width:auto;min-height:0}
 
 <script>
 // Bump on every commit so you can tell when the new version is live
-const APP_VERSION = '0.7.1';
+const APP_VERSION = '0.8.0';
 const KNOWN_MSG_TYPES = {0x00: 'Incoming call', 0x01: 'Message / SMS', 0x02: 'WeChat', 0x03: 'QQ', 0x04: 'Facebook', 0x05: 'Twitter / X', 0x06: 'Instagram', 0x07: 'Skype', 0x08: 'WhatsApp', 0x09: 'LINE', 0x0A: 'KakaoTalk', 0x0B: 'Gmail', '0x0C-0x1F': 'Other (generic)'};
 const APP_BUILD = '2026-11-13';
 
@@ -301,6 +335,7 @@ const NAMES = {0x6E:'background transfer',0x74:'face transfer',0x84:'face suppor
 
 let dumpCollector = null;
 let faceStartAck = null;
+let lastSent = { cmd: -1, t: 0 };
 let device = null, cmdChr = null, fileChr = null, faceRejected = false, faceAbort = false, faceBusy = false, hrChr = null, hrOn = false, writeNoResp = true, rxBuf = [];
 const $ = id => document.getElementById(id);
 const toHex = b => Array.from(b, x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
@@ -337,6 +372,7 @@ function buildPacket(cmd, payload = []) {
 
 async function writeBytes(bytes) {
   if (!cmdChr) throw new Error('Not connected');
+  if (bytes.length > 4 && bytes[0] === 0xFE && bytes[1] === 0xEA) lastSent = { cmd: bytes[4], t: Date.now() };
   for (let off = 0; off < bytes.length; off += 20) {
     const chunk = bytes.slice(off, off + 20);
     if (writeNoResp && cmdChr.writeValueWithoutResponse) {
@@ -374,6 +410,8 @@ function handlePacket(p) {
   }
   if ((cmd === 0x6E || cmd === 0x74) && data.length && data.every(b => b === 0xFF)) faceRejected = true;
   else if (cmd === 0x6E && faceStartAck === false) faceStartAck = toHex(data) || '(empty)';
+  const isReply = cmd === lastSent.cmd && Date.now() - lastSent.t < 3000;
+  if (!isReply && !dumpCollector) onWatchEvent(cmd, data, p);
   const name = NAMES[cmd] ? ' (' + NAMES[cmd] + ')' : '';
   let extra = '';
   if (cmd === 0x29 && data.length) extra = ' → face ' + data[0];
@@ -468,6 +506,7 @@ async function connectTo(dev) {
     } catch (e) { hrChr = null; }
     setConnected(true);
     setTimeout(() => { if (cmdChr) send(0x39); }, 300); // learn the face size
+    setTimeout(() => { if (cmdChr && lastWeather && $('evAutoWeather').checked) sendWeather(lastWeather); }, 1200);
     connectMsg('Connected to ' + (device.name || 'device') + ' — ready.', 'ok');
   } catch (e) {
     connectMsg('✕ Connection failed: ' + errText(e), 'warn');
@@ -899,6 +938,191 @@ function testNextType() {
   log('Sent icon test ' + label + ' — note which icon appears', 'ok');
 }
 
+
+// ================= Watch events =================
+// From Gadgetbridge's Da Fit notes: 67 = music/call buttons, 66 = camera shutter,
+// 62 = find phone (00 start, other = stop), 64 = watch wants weather, 34 = workout finished.
+const hx = n => n.toString(16).toUpperCase().padStart(2, '0');
+const EVENTS = {
+  0x67: d => ({ name: 'Music / call button', detail: ({ 0: 'Play/Pause', 1: 'Previous', 2: 'Next', 3: 'Reject call' })[d[0]] || ('op ' + hx(d[0] ?? 0)) }),
+  0x66: () => ({ name: 'Camera shutter' }),
+  0x62: d => ({ name: 'Find phone', detail: d[0] === 0 ? 'start' : 'stop' }),
+  0x64: () => ({ name: 'Watch asks for weather' }),
+  0x34: () => ({ name: 'Workout finished' })
+};
+let watchEvents = [], cameraCount = 0, audioCtx = null, ringTimer = null;
+
+function ensureAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (_) {}
+}
+
+function beep() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(1760, t);
+  o.frequency.setValueAtTime(1320, t + 0.15);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);
+  o.stop(t + 0.35);
+}
+
+function startRing() {
+  if (!$('evBeep').checked) return;
+  stopRing(false);
+  beep();
+  ringTimer = setInterval(beep, 600);
+  $('ringStopBtn').disabled = false;
+  if (navigator.vibrate) { try { navigator.vibrate([300, 200, 300, 200, 300]); } catch (_) {} }
+}
+
+function stopRing(tellWatch) {
+  if (ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+  $('ringStopBtn').disabled = true;
+  if (tellWatch && cmdChr) send(0x62, [0xFF]);
+}
+
+function onWatchEvent(cmd, data, p) {
+  const info = EVENTS[cmd] ? EVENTS[cmd](data) : { name: 'Unknown command ' + hx(cmd) };
+  const ev = {
+    time: new Date().toLocaleTimeString(),
+    tag: $('evTag').value.trim() || undefined,
+    cmd: hx(cmd), name: info.name, detail: info.detail, hex: toHex(p)
+  };
+  watchEvents.unshift(ev);
+  if (watchEvents.length > 200) watchEvents.length = 200;
+  renderEvents();
+  if (cmd === 0x67) $('evMusic').textContent = info.detail;
+  if (cmd === 0x66) $('evCamera').textContent = String(++cameraCount);
+  if (cmd === 0x62) { if (data[0] === 0) startRing(); else stopRing(false); }
+  if (cmd === 0x64 && $('evAutoWeather').checked && lastWeather) sendWeather(lastWeather);
+}
+
+function renderEvents() {
+  const list = $('evList');
+  list.textContent = '';
+  $('evEmpty').style.display = watchEvents.length ? 'none' : 'block';
+  for (const ev of watchEvents.slice(0, 50)) {
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)';
+    if (EVENTS[parseInt(ev.cmd, 16)]) row.style.borderColor = 'var(--ok)';
+    const top = document.createElement('div');
+    top.style.cssText = 'display:flex;justify-content:space-between;gap:8px';
+    const nm = document.createElement('b');
+    nm.textContent = ev.name + (ev.detail ? ' · ' + ev.detail : '');
+    const tm = document.createElement('span');
+    tm.className = 'hint'; tm.style.margin = '0'; tm.textContent = ev.time;
+    top.append(nm, tm);
+    const sub = document.createElement('div');
+    sub.className = 'hint';
+    sub.style.cssText = 'margin:2px 0 0;font-family:var(--mono);word-break:break-all';
+    sub.textContent = (ev.tag ? '"' + ev.tag + '" · ' : '') + ev.hex;
+    row.append(top, sub);
+    list.append(row);
+  }
+}
+
+async function copyEvents() {
+  const text = JSON.stringify({ app: 'v' + APP_VERSION, events: watchEvents }, null, 1);
+  try { await navigator.clipboard.writeText(text); $('evEmpty').textContent = 'Copied — paste it into the chat.'; }
+  catch (_) {
+    const t = document.createElement('textarea');
+    t.value = text; document.body.append(t); t.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    t.remove();
+  }
+  $('evEmpty').style.display = 'block';
+  $('evEmpty').textContent = 'Copied ' + watchEvents.length + ' events — paste them into the chat.';
+}
+
+// ================= Weather =================
+// 43 today: {0 (no pm2.5), condition, temp(int8), lunar[4 chars UTF-16BE], city[4 chars UTF-16BE]}
+// 42 forecast: 7 x {condition, low, high}. Conditions: 0 cloudy, 1 fog, 2 overcast, 3 rain, 4 snow, 5 sunny, 6 wind, 7 haze
+const WX_NAMES = ['Cloudy', 'Foggy', 'Partly cloudy', 'Rain', 'Snow', 'Sunny', 'Windy', 'Haze'];
+let lastWeather = null;
+
+function wmoToDafit(c) {
+  if (c === 0 || c === 1) return 5;
+  if (c === 2) return 2;
+  if (c === 3) return 0;
+  if (c === 45 || c === 48) return 1;
+  if ((c >= 71 && c <= 77) || c === 85 || c === 86) return 4;
+  if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95) return 3;
+  return 7;
+}
+
+const i8 = v => (Math.max(-128, Math.min(127, Math.round(v))) + 256) & 255;
+
+function utf16be4(str) {
+  const s = String(str || '').slice(0, 4).padEnd(4, ' ');
+  const out = [];
+  for (let i = 0; i < 4; i++) { const c = s.charCodeAt(i); out.push(c >> 8, c & 255); }
+  return out;
+}
+
+function savePref(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+function loadPref(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+
+async function loadWeather(lat, lon, name) {
+  $('wxInfo').textContent = 'Fetching the forecast…';
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+    '&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8';
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Weather service error ' + r.status);
+  const j = await r.json();
+  const days = [];
+  for (let i = 1; i <= 7; i++) {
+    days.push({ id: wmoToDafit(j.daily.weather_code[i]), lo: j.daily.temperature_2m_min[i], hi: j.daily.temperature_2m_max[i] });
+  }
+  lastWeather = { name, id: wmoToDafit(j.current.weather_code), temp: j.current.temperature_2m, days };
+  if (!$('wxLabel').value) $('wxLabel').value = String(name || '').replace(/[^A-Za-z0-9 ]/g, '').slice(0, 4).toUpperCase();
+  $('wxInfo').textContent = name + ': ' + Math.round(lastWeather.temp) + '°C, ' + WX_NAMES[lastWeather.id] +
+    ' · tomorrow ' + Math.round(days[0].lo) + '–' + Math.round(days[0].hi) + '°C, ' + WX_NAMES[days[0].id];
+}
+
+async function weatherByCity() {
+  const q = $('wxCity').value.trim();
+  if (!q) { $('wxInfo').textContent = 'Type a city first.'; return; }
+  try {
+    $('wxInfo').textContent = 'Looking up ' + q + '…';
+    const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=' + encodeURIComponent(q));
+    const j = await r.json();
+    const hit = j.results && j.results[0];
+    if (!hit) { $('wxInfo').textContent = 'No place called "' + q + '" found.'; return; }
+    savePref('wxCity', q);
+    await loadWeather(hit.latitude, hit.longitude, hit.name + (hit.country_code ? ', ' + hit.country_code : ''));
+  } catch (e) { $('wxInfo').textContent = '✕ ' + errText(e); }
+}
+
+function weatherByLocation() {
+  if (!navigator.geolocation) { $('wxInfo').textContent = 'Location isn\'t available here — type a city instead.'; return; }
+  $('wxInfo').textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition(
+    pos => loadWeather(pos.coords.latitude.toFixed(3), pos.coords.longitude.toFixed(3), 'Here').catch(e => { $('wxInfo').textContent = '✕ ' + errText(e); }),
+    err => { $('wxInfo').textContent = 'Location blocked (' + errText(err) + ') — type a city instead.'; },
+    { timeout: 10000, maximumAge: 600000 }
+  );
+}
+
+async function sendWeather(w) {
+  if (!w) { $('wxInfo').textContent = 'Load the weather first.'; return; }
+  const label = $('wxLabel').value || w.name || '';
+  savePref('wxLabel', $('wxLabel').value);
+  await send(0x43, [0, w.id, i8(w.temp), ...utf16be4('    '), ...utf16be4(label)]);
+  await sleep(300);
+  const f = [];
+  w.days.forEach(d => f.push(d.id, i8(d.lo), i8(d.hi)));
+  await send(0x42, f);
+  log('Weather sent: ' + Math.round(w.temp) + '°C ' + WX_NAMES[w.id], 'ok');
+  $('wxInfo').textContent = $('wxInfo').textContent.replace(/ · sent.*$/, '') + ' · sent ' + new Date().toLocaleTimeString();
+}
+
 // ---- Diagnostics ----
 async function runDiagnostics() {
   const lines = [];
@@ -1025,7 +1249,7 @@ function syncTime() {
 
 function setGoal() {
   const g = Math.max(1, Math.min(100000, parseInt($('goal').value, 10) || 0));
-  send(0x16, [g & 255, (g >>> 8) & 255, (g >>> 16) & 255, (g >>> 24) & 255]); // little-endian (watch replies 58 1B 00 00 = 7000)
+  send(0x16, [(g >>> 24) & 255, (g >>> 16) & 255, (g >>> 8) & 255, g & 255]); // set is big-endian; the query reply (26) comes back little-endian
 }
 
 async function sendRaw() {
@@ -1044,6 +1268,15 @@ async function sendRaw() {
 $('connectBtn').onclick = () => connect(false);
 $('pickAllBtn').onclick = () => connect(true);
 $('scanBtn').onclick = scan;
+$('ringStopBtn').onclick = () => stopRing(true);
+$('evCopyBtn').onclick = copyEvents;
+$('evClearBtn').onclick = () => { watchEvents = []; renderEvents(); $('evEmpty').textContent = 'No events yet.'; };
+$('wxLocBtn').onclick = weatherByLocation;
+$('wxSearchBtn').onclick = weatherByCity;
+$('wxCity').addEventListener('keydown', e => { if (e.key === 'Enter') weatherByCity(); });
+$('wxSendBtn').onclick = () => sendWeather(lastWeather);
+// iOS only allows sound after a tap, so unlock audio on any tap
+document.addEventListener('click', ensureAudio, true);
 $('dumpBtn').onclick = runDump;
 $('dumpCopyBtn').onclick = copyDump;
 $('dumpShareBtn').onclick = shareDump;
@@ -1073,6 +1306,11 @@ $('msgText').addEventListener('input', updateMsgInfo);
 document.querySelectorAll('[data-face]').forEach(b => b.onclick = () => send(0x19, [parseInt(b.dataset.face, 10)]));
 document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => send(parseInt(b.dataset.cmd, 16), b.dataset.arg ? parseHex(b.dataset.arg) : []));
 
+(() => {
+  const c = loadPref('wxCity'), l = loadPref('wxLabel');
+  if (l) $('wxLabel').value = l;
+  if (c) { $('wxCity').value = c; weatherByCity(); }
+})();
 drawFace();
 $('appVersion').textContent = 'v' + APP_VERSION + ' · ' + APP_BUILD;
 setConnected(false);

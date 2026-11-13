@@ -49,6 +49,24 @@ The watch reports its face size in the reply to `39`; on the Drift it is **240×
 
 There is no acknowledgement or checksum per packet, so a single dropped packet shifts every pixel after it. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
 
+## Watch → phone events
+
+| Cmd | Meaning |
+|---|---|
+| `67 xx` | Music/call button: `00` play/pause, `01` previous, `02` next, `03` reject call |
+| `66` | Camera shutter pressed |
+| `62 00` / `62 xx` | Find phone start / stop (send `62 FF` to stop from the phone) |
+| `64` | Watch wants weather resent |
+| `34` | Workout finished |
+
+## Weather
+
+- `43` today: `00`, condition, temperature (int8), 4 chars UTF-16BE (lunar/festival, spaces), 4 chars UTF-16BE (city)
+- `42` forecast: 7 × (condition, low, high)
+- Conditions: `0` cloudy, `1` fog, `2` overcast, `3` rain, `4` snow, `5` sunny, `6` wind, `7` haze
+
+Protocol details from Gadgetbridge's Da Fit notes (DaFitConstants.java in the MT863 fork).
+
 ## Message icon types (command 41)
 
 | Type | Icon |
@@ -73,6 +91,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.8.0 | Watch events panel (music buttons, camera shutter, find phone rings the page, weather requests, unknown packets); live weather push via Open-Meteo; step goal set back to big-endian (query reply is little-endian) |
 | 0.7.1 | 500 ms pause every 4 KB during face upload (watch drops a packet while flushing to flash) |
 | 0.7.0 | Face upload fixed: 128-byte chunks at 80 ms (watch drops packets if faster) and a 3 s wait after the start command (watch drops the first packets while erasing flash) |
 | 0.6.3 | Types 0C–1F labelled Other |
