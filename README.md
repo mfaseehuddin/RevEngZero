@@ -47,7 +47,7 @@ The watch reports its face size in the reply to `39`; on the Drift it is **240×
    - **A short pause every 4 KB** (40 ms confirmed working): the watch can drop a packet while flushing each block to flash
 4. `FE EA 20 09 6E 00 00 00 00` (finish), `FE EA 20 05 29`, `FE EA 20 06 19 01` (show photo face)
 
-There is no acknowledgement or checksum per packet, so a single dropped packet shifts every pixel after it. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
+**Update:** the watch *does* acknowledge. On `FEE3` it replies `6E 00 00` when ready (about 2.3 s after start), then `6E nn nn` with the running count of packets received after every `FEE6` write, and finally `6E FF FF cc cc` (transfer complete + 16-bit checksum). Pacing on these replies replaces the fixed delays. A dropped packet shows up as the count falling behind, and the checksum confirms the stored image. A test pattern (colour bars, border, diagonal) makes each failure type easy to recognise.
 
 ## Clock layout (photo face)
 
@@ -95,6 +95,7 @@ The page shows its version under the title (`APP_VERSION` in `index.html`). Bump
 
 | Version | Change |
 |---|---|
+| 0.10.0 | Ack-driven face upload: waits for the watch's ready signal, paces on its per-packet acknowledgements, verifies the final checksum |
 | 0.9.2 | Upload trace recorder (every watch reply during a face upload with bytes sent and time) and Copy log |
 | 0.9.1 | Upload speed presets with time estimates and remembered settings; default 4 KB pause 40 ms (133 s confirmed at 128 B / 80 ms) |
 | 0.9.0 | Clock layout editor for the photo face (`38`/`39`): position, color, content above/below, live preview overlay |
